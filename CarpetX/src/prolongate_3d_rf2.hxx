@@ -15,12 +15,13 @@ std::ostream &operator<<(std::ostream &os, centering_t cent);
 constexpr auto VC = centering_t::vertex;
 constexpr auto CC = centering_t::cell;
 
-enum class interpolation_t { poly, hermite, cons, eno };
+enum class interpolation_t { poly, hermite, cons, eno, minmod };
 std::ostream &operator<<(std::ostream &os, interpolation_t cent);
 constexpr auto POLY = interpolation_t::poly;
 constexpr auto HERMITE = interpolation_t::hermite;
 constexpr auto CONS = interpolation_t::cons;
 constexpr auto ENO = interpolation_t::eno;
+constexpr auto MINMOD = interpolation_t::minmod;
 
 enum class fallback_t { none, linear };
 std::ostream &operator<<(std::ostream &os, fallback_t fb);
@@ -39,16 +40,21 @@ class prolongate_3d_rf2 final : public amrex::Interpolater {
 
   // Conservative must be one of the possible choices
   static_assert(INTPI == POLY || INTPI == HERMITE || INTPI == CONS ||
-                INTPI == ENO);
+                INTPI == ENO || INTPI == MINMOD);
   static_assert(INTPJ == POLY || INTPJ == HERMITE || INTPJ == CONS ||
-                INTPJ == ENO);
+                INTPJ == ENO || INTPJ == MINMOD);
   static_assert(INTPK == POLY || INTPK == HERMITE || INTPK == CONS ||
-                INTPK == ENO);
+                INTPK == ENO || INTPK == MINMOD);
 
   // Order must be nonnegative
   static_assert(ORDERI >= 0);
   static_assert(ORDERJ >= 0);
   static_assert(ORDERK >= 0);
+
+  // Minmod is always linear
+  static_assert(INTPI == MINMOD ? ORDERI == 1 : true);
+  static_assert(INTPJ == MINMOD ? ORDERJ == 1 : true);
+  static_assert(INTPK == MINMOD ? ORDERK == 1 : true);
 
   // Fallback must be one of the possible choices
   static_assert(FB == FB_NONE || FB == FB_LINEAR);
@@ -71,6 +77,27 @@ public:
   virtual amrex::Box CoarseBox(const amrex::Box &fine,
                                const amrex::IntVect &ratio) override;
 
+#ifndef AMREX_USE_GPU
+private:
+#endif
+  void interp_per_var(const amrex::FArrayBox &crse, int crse_comp,
+                      amrex::FArrayBox &fine, int fine_comp, int ncomp,
+                      const amrex::Box &fine_region,
+                      const amrex::IntVect &ratio,
+                      const amrex::Geometry &crse_geom,
+                      const amrex::Geometry &fine_geom,
+                      amrex::Vector<amrex::BCRec> const &bcr, int actual_comp,
+                      int actual_state, amrex::RunOn gpu_or_cpu);
+  void interp_per_group(const amrex::FArrayBox &crse, int crse_comp,
+                        amrex::FArrayBox &fine, int fine_comp, int ncomp,
+                        const amrex::Box &fine_region,
+                        const amrex::IntVect &ratio,
+                        const amrex::Geometry &crse_geom,
+                        const amrex::Geometry &fine_geom,
+                        amrex::Vector<amrex::BCRec> const &bcr, int actual_comp,
+                        int actual_state, amrex::RunOn gpu_or_cpu);
+
+public:
   virtual void interp(const amrex::FArrayBox &crse, int crse_comp,
                       amrex::FArrayBox &fine, int fine_comp, int ncomp,
                       const amrex::Box &fine_region,
@@ -96,38 +123,72 @@ public:
 // Polynomial (Lagrange) interpolation
 
 extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c000_o1;
+    prolongate_poly_3d_rf2_c000_o1;
 extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c001_o1;
+    prolongate_poly_3d_rf2_c001_o1;
 extern prolongate_3d_rf2<VC, CC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c010_o1;
+    prolongate_poly_3d_rf2_c010_o1;
 extern prolongate_3d_rf2<VC, CC, CC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c011_o1;
+    prolongate_poly_3d_rf2_c011_o1;
 extern prolongate_3d_rf2<CC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c100_o1;
+    prolongate_poly_3d_rf2_c100_o1;
 extern prolongate_3d_rf2<CC, VC, CC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c101_o1;
+    prolongate_poly_3d_rf2_c101_o1;
 extern prolongate_3d_rf2<CC, CC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c110_o1;
+    prolongate_poly_3d_rf2_c110_o1;
 extern prolongate_3d_rf2<CC, CC, CC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_3d_rf2_c111_o1;
+    prolongate_poly_3d_rf2_c111_o1;
 
 extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c000_o3;
+    prolongate_poly_3d_rf2_c000_o3;
 extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c001_o3;
+    prolongate_poly_3d_rf2_c001_o3;
 extern prolongate_3d_rf2<VC, CC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c010_o3;
+    prolongate_poly_3d_rf2_c010_o3;
 extern prolongate_3d_rf2<VC, CC, CC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c011_o3;
+    prolongate_poly_3d_rf2_c011_o3;
 extern prolongate_3d_rf2<CC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c100_o3;
+    prolongate_poly_3d_rf2_c100_o3;
 extern prolongate_3d_rf2<CC, VC, CC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c101_o3;
+    prolongate_poly_3d_rf2_c101_o3;
 extern prolongate_3d_rf2<CC, CC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c110_o3;
+    prolongate_poly_3d_rf2_c110_o3;
 extern prolongate_3d_rf2<CC, CC, CC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_3d_rf2_c111_o3;
+    prolongate_poly_3d_rf2_c111_o3;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c000_o5;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c001_o5;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c010_o5;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c011_o5;
+extern prolongate_3d_rf2<CC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c100_o5;
+extern prolongate_3d_rf2<CC, VC, CC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c101_o5;
+extern prolongate_3d_rf2<CC, CC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c110_o5;
+extern prolongate_3d_rf2<CC, CC, CC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_poly_3d_rf2_c111_o5;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c000_o7;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c001_o7;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c010_o7;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c011_o7;
+extern prolongate_3d_rf2<CC, VC, VC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c100_o7;
+extern prolongate_3d_rf2<CC, VC, CC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c101_o7;
+extern prolongate_3d_rf2<CC, CC, VC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c110_o7;
+extern prolongate_3d_rf2<CC, CC, CC, POLY, POLY, POLY, 7, 7, 7, FB_NONE>
+    prolongate_poly_3d_rf2_c111_o7;
 
 // Conservative interpolation
 
@@ -169,7 +230,7 @@ extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 2, 2, 2, FB_NONE>
 
 // Prolongation operators for discrete differential forms:
 // interpolating (non-conservative) for vertex centred directions,
-// conservative for cell centred directions.
+// conservative (with one order lower) for cell centred directions.
 extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
     prolongate_ddf_3d_rf2_c000_o1;
 extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, CONS, 1, 1, 0, FB_NONE>
@@ -237,115 +298,6 @@ extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, POLY, 6, 6, 7, FB_NONE>
     prolongate_ddf_3d_rf2_c110_o7;
 extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 6, 6, 6, FB_NONE>
     prolongate_ddf_3d_rf2_c111_o7;
-
-// DDF ENO (tensor product) interpolation
-
-extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c000_o1;
-extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 1, 1, 0, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c001_o1;
-extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 1, 0, 1, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c010_o1;
-extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 1, 0, 0, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c011_o1;
-extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 0, 1, 1, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c100_o1;
-extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 0, 1, 0, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c101_o1;
-extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 0, 0, 1, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c110_o1;
-extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 0, 0, 0, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c111_o1;
-
-extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c000_o3;
-extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 3, 3, 2, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c001_o3;
-extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 3, 2, 3, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c010_o3;
-extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 3, 2, 2, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c011_o3;
-extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 2, 3, 3, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c100_o3;
-extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 2, 3, 2, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c101_o3;
-extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 2, 2, 3, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c110_o3;
-extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 2, 2, 2, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c111_o3;
-
-extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c000_o5;
-extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 5, 5, 4, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c001_o5;
-extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 5, 4, 5, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c010_o5;
-extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 5, 4, 4, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c011_o5;
-extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 4, 5, 5, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c100_o5;
-extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 4, 5, 4, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c101_o5;
-extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 4, 4, 5, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c110_o5;
-extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 4, 4, 4, FB_NONE>
-    prolongate_ddf_eno_3d_rf2_c111_o5;
-
-// Hermite interpolation
-
-extern prolongate_3d_rf2<VC, VC, VC, HERMITE, HERMITE, HERMITE, 1, 1, 1,
-                         FB_NONE>
-    prolongate_ddfh_3d_rf2_c000_o1;
-extern prolongate_3d_rf2<VC, VC, CC, HERMITE, HERMITE, CONS, 1, 1, 0, FB_NONE>
-    prolongate_ddfh_3d_rf2_c001_o1;
-extern prolongate_3d_rf2<VC, CC, VC, HERMITE, CONS, HERMITE, 1, 0, 1, FB_NONE>
-    prolongate_ddfh_3d_rf2_c010_o1;
-extern prolongate_3d_rf2<VC, CC, CC, HERMITE, CONS, CONS, 1, 0, 0, FB_NONE>
-    prolongate_ddfh_3d_rf2_c011_o1;
-extern prolongate_3d_rf2<CC, VC, VC, CONS, HERMITE, HERMITE, 0, 1, 1, FB_NONE>
-    prolongate_ddfh_3d_rf2_c100_o1;
-extern prolongate_3d_rf2<CC, VC, CC, CONS, HERMITE, CONS, 0, 1, 0, FB_NONE>
-    prolongate_ddfh_3d_rf2_c101_o1;
-extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, HERMITE, 0, 0, 1, FB_NONE>
-    prolongate_ddfh_3d_rf2_c110_o1;
-extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 0, 0, 0, FB_NONE>
-    prolongate_ddfh_3d_rf2_c111_o1;
-
-extern prolongate_3d_rf2<VC, VC, VC, HERMITE, HERMITE, HERMITE, 3, 3, 3,
-                         FB_NONE>
-    prolongate_ddfh_3d_rf2_c000_o3;
-extern prolongate_3d_rf2<VC, VC, CC, HERMITE, HERMITE, CONS, 3, 3, 2, FB_NONE>
-    prolongate_ddfh_3d_rf2_c001_o3;
-extern prolongate_3d_rf2<VC, CC, VC, HERMITE, CONS, HERMITE, 3, 2, 3, FB_NONE>
-    prolongate_ddfh_3d_rf2_c010_o3;
-extern prolongate_3d_rf2<VC, CC, CC, HERMITE, CONS, CONS, 3, 2, 2, FB_NONE>
-    prolongate_ddfh_3d_rf2_c011_o3;
-extern prolongate_3d_rf2<CC, VC, VC, CONS, HERMITE, HERMITE, 2, 3, 3, FB_NONE>
-    prolongate_ddfh_3d_rf2_c100_o3;
-extern prolongate_3d_rf2<CC, VC, CC, CONS, HERMITE, CONS, 2, 3, 2, FB_NONE>
-    prolongate_ddfh_3d_rf2_c101_o3;
-extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, HERMITE, 2, 2, 3, FB_NONE>
-    prolongate_ddfh_3d_rf2_c110_o3;
-extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 2, 2, 2, FB_NONE>
-    prolongate_ddfh_3d_rf2_c111_o3;
-
-extern prolongate_3d_rf2<VC, VC, VC, HERMITE, HERMITE, HERMITE, 5, 5, 5,
-                         FB_NONE>
-    prolongate_ddfh_3d_rf2_c000_o5;
-extern prolongate_3d_rf2<VC, VC, CC, HERMITE, HERMITE, CONS, 5, 5, 4, FB_NONE>
-    prolongate_ddfh_3d_rf2_c001_o5;
-extern prolongate_3d_rf2<VC, CC, VC, HERMITE, CONS, HERMITE, 5, 4, 5, FB_NONE>
-    prolongate_ddfh_3d_rf2_c010_o5;
-extern prolongate_3d_rf2<VC, CC, CC, HERMITE, CONS, CONS, 5, 4, 4, FB_NONE>
-    prolongate_ddfh_3d_rf2_c011_o5;
-extern prolongate_3d_rf2<CC, VC, VC, CONS, HERMITE, HERMITE, 4, 5, 5, FB_NONE>
-    prolongate_ddfh_3d_rf2_c100_o5;
-extern prolongate_3d_rf2<CC, VC, CC, CONS, HERMITE, CONS, 4, 5, 4, FB_NONE>
-    prolongate_ddfh_3d_rf2_c101_o5;
-extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, HERMITE, 4, 4, 5, FB_NONE>
-    prolongate_ddfh_3d_rf2_c110_o5;
-extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 4, 4, 4, FB_NONE>
-    prolongate_ddfh_3d_rf2_c111_o5;
 
 // Natural interpolation
 
@@ -419,6 +371,151 @@ extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, POLY, 7, 7, 7, FB_NONE>
 extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 7, 7, 7, FB_NONE>
     prolongate_natural_3d_rf2_c111_o7;
 
+// ENO (tensor product) interpolation
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
+    prolongate_eno_3d_rf2_c000_o3;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 3, 3, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c001_o3;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 3, 2, 3, FB_NONE>
+    prolongate_eno_3d_rf2_c010_o3;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 3, 2, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c011_o3;
+extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 2, 3, 3, FB_NONE>
+    prolongate_eno_3d_rf2_c100_o3;
+extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 2, 3, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c101_o3;
+extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 2, 2, 3, FB_NONE>
+    prolongate_eno_3d_rf2_c110_o3;
+extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 2, 2, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c111_o3;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_eno_3d_rf2_c000_o5;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 5, 5, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c001_o5;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 5, 2, 5, FB_NONE>
+    prolongate_eno_3d_rf2_c010_o5;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 5, 2, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c011_o5;
+extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 2, 5, 5, FB_NONE>
+    prolongate_eno_3d_rf2_c100_o5;
+extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 2, 5, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c101_o5;
+extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 2, 2, 5, FB_NONE>
+    prolongate_eno_3d_rf2_c110_o5;
+extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 2, 2, 2, FB_NONE>
+    prolongate_eno_3d_rf2_c111_o5;
+
+// Minmod (tensor product) interpolation
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c000_o1;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, MINMOD, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c001_o1;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, MINMOD, POLY, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c010_o1;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, MINMOD, MINMOD, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c011_o1;
+extern prolongate_3d_rf2<CC, VC, VC, MINMOD, POLY, POLY, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c100_o1;
+extern prolongate_3d_rf2<CC, VC, CC, MINMOD, POLY, MINMOD, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c101_o1;
+extern prolongate_3d_rf2<CC, CC, VC, MINMOD, MINMOD, POLY, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c110_o1;
+extern prolongate_3d_rf2<CC, CC, CC, MINMOD, MINMOD, MINMOD, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c111_o1;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_NONE>
+    prolongate_minmod_3d_rf2_c000_o3;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, MINMOD, 3, 3, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c001_o3;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, MINMOD, POLY, 3, 1, 3, FB_NONE>
+    prolongate_minmod_3d_rf2_c010_o3;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, MINMOD, MINMOD, 3, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c011_o3;
+extern prolongate_3d_rf2<CC, VC, VC, MINMOD, POLY, POLY, 1, 3, 3, FB_NONE>
+    prolongate_minmod_3d_rf2_c100_o3;
+extern prolongate_3d_rf2<CC, VC, CC, MINMOD, POLY, MINMOD, 1, 3, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c101_o3;
+extern prolongate_3d_rf2<CC, CC, VC, MINMOD, MINMOD, POLY, 1, 1, 3, FB_NONE>
+    prolongate_minmod_3d_rf2_c110_o3;
+extern prolongate_3d_rf2<CC, CC, CC, MINMOD, MINMOD, MINMOD, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c111_o3;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_NONE>
+    prolongate_minmod_3d_rf2_c000_o5;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, MINMOD, 5, 5, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c001_o5;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, MINMOD, POLY, 5, 1, 5, FB_NONE>
+    prolongate_minmod_3d_rf2_c010_o5;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, MINMOD, MINMOD, 5, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c011_o5;
+extern prolongate_3d_rf2<CC, VC, VC, MINMOD, POLY, POLY, 1, 5, 5, FB_NONE>
+    prolongate_minmod_3d_rf2_c100_o5;
+extern prolongate_3d_rf2<CC, VC, CC, MINMOD, POLY, MINMOD, 1, 5, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c101_o5;
+extern prolongate_3d_rf2<CC, CC, VC, MINMOD, MINMOD, POLY, 1, 1, 5, FB_NONE>
+    prolongate_minmod_3d_rf2_c110_o5;
+extern prolongate_3d_rf2<CC, CC, CC, MINMOD, MINMOD, MINMOD, 1, 1, 1, FB_NONE>
+    prolongate_minmod_3d_rf2_c111_o5;
+
+// Hermite interpolation
+
+extern prolongate_3d_rf2<VC, VC, VC, HERMITE, HERMITE, HERMITE, 1, 1, 1,
+                         FB_NONE>
+    prolongate_hermite_3d_rf2_c000_o1;
+extern prolongate_3d_rf2<VC, VC, CC, HERMITE, HERMITE, CONS, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c001_o1;
+extern prolongate_3d_rf2<VC, CC, VC, HERMITE, CONS, HERMITE, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c010_o1;
+extern prolongate_3d_rf2<VC, CC, CC, HERMITE, CONS, CONS, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c011_o1;
+extern prolongate_3d_rf2<CC, VC, VC, CONS, HERMITE, HERMITE, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c100_o1;
+extern prolongate_3d_rf2<CC, VC, CC, CONS, HERMITE, CONS, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c101_o1;
+extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, HERMITE, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c110_o1;
+extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 1, 1, 1, FB_NONE>
+    prolongate_hermite_3d_rf2_c111_o1;
+
+extern prolongate_3d_rf2<VC, VC, VC, HERMITE, HERMITE, HERMITE, 3, 3, 3,
+                         FB_NONE>
+    prolongate_hermite_3d_rf2_c000_o3;
+extern prolongate_3d_rf2<VC, VC, CC, HERMITE, HERMITE, CONS, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c001_o3;
+extern prolongate_3d_rf2<VC, CC, VC, HERMITE, CONS, HERMITE, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c010_o3;
+extern prolongate_3d_rf2<VC, CC, CC, HERMITE, CONS, CONS, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c011_o3;
+extern prolongate_3d_rf2<CC, VC, VC, CONS, HERMITE, HERMITE, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c100_o3;
+extern prolongate_3d_rf2<CC, VC, CC, CONS, HERMITE, CONS, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c101_o3;
+extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, HERMITE, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c110_o3;
+extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 3, 3, 3, FB_NONE>
+    prolongate_hermite_3d_rf2_c111_o3;
+
+extern prolongate_3d_rf2<VC, VC, VC, HERMITE, HERMITE, HERMITE, 5, 5, 5,
+                         FB_NONE>
+    prolongate_hermite_3d_rf2_c000_o5;
+extern prolongate_3d_rf2<VC, VC, CC, HERMITE, HERMITE, CONS, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c001_o5;
+extern prolongate_3d_rf2<VC, CC, VC, HERMITE, CONS, HERMITE, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c010_o5;
+extern prolongate_3d_rf2<VC, CC, CC, HERMITE, CONS, CONS, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c011_o5;
+extern prolongate_3d_rf2<CC, VC, VC, CONS, HERMITE, HERMITE, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c100_o5;
+extern prolongate_3d_rf2<CC, VC, CC, CONS, HERMITE, CONS, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c101_o5;
+extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, HERMITE, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c110_o5;
+extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 5, 5, 5, FB_NONE>
+    prolongate_hermite_3d_rf2_c111_o5;
+
 // Interpolate polynomially in vertex centred directions and conserve
 // with 3rd order accuracy and a linear fallback in cell centred
 // directions
@@ -491,6 +588,131 @@ extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, POLY, 3, 3, 7, FB_LINEAR>
     prolongate_poly_cons3lfb_3d_rf2_c110_o7;
 extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 3, 3, 3, FB_LINEAR>
     prolongate_poly_cons3lfb_3d_rf2_c111_o7;
+#endif
+
+// Interpolate polynomially in vertex centred directions and use ENO
+// interpolation with 3rd order accuracy and a linear fallback in cell
+// centred directions
+
+// extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c000_o1;
+// extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c001_o1;
+// extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c010_o1;
+// extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c011_o1;
+// extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c100_o1;
+// extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c101_o1;
+// extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c110_o1;
+// extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 1, 1, 1, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c111_o1;
+//
+// extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c000_o3;
+// extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c001_o3;
+// extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c010_o3;
+// extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c011_o3;
+// extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c100_o3;
+// extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c101_o3;
+// extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c110_o3;
+// extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c111_o3;
+//
+// extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c000_o5;
+// extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 5, 5, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c001_o5;
+// extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 5, 3, 5, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c010_o5;
+// extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 5, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c011_o5;
+// extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 3, 5, 5, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c100_o5;
+// extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 3, 5, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c101_o5;
+// extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 3, 3, 5, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c110_o5;
+// extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 3, 3, 3, FB_LINEAR>
+//     prolongate_poly_eno3lfb_3d_rf2_c111_o5;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 1, 1, 1, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c000_o1;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, CONS, 1, 1, 0, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c001_o1;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, CONS, POLY, 1, 0, 1, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c010_o1;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, CONS, CONS, 1, 0, 0, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c011_o1;
+extern prolongate_3d_rf2<CC, VC, VC, CONS, POLY, POLY, 0, 1, 1, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c100_o1;
+extern prolongate_3d_rf2<CC, VC, CC, CONS, POLY, CONS, 0, 1, 0, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c101_o1;
+extern prolongate_3d_rf2<CC, CC, VC, CONS, CONS, POLY, 0, 0, 1, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c110_o1;
+extern prolongate_3d_rf2<CC, CC, CC, CONS, CONS, CONS, 0, 0, 0, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c111_o1;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 3, 3, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c000_o3;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 3, 3, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c001_o3;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 3, 2, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c010_o3;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 3, 2, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c011_o3;
+extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 2, 3, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c100_o3;
+extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 2, 3, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c101_o3;
+extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 2, 2, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c110_o3;
+extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 2, 2, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c111_o3;
+
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 5, 5, 5, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c000_o5;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 5, 5, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c001_o5;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 5, 2, 5, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c010_o5;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 5, 2, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c011_o5;
+extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 2, 5, 5, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c100_o5;
+extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 2, 5, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c101_o5;
+extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 2, 2, 5, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c110_o5;
+extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 2, 2, 2, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c111_o5;
+
+#if 0
+extern prolongate_3d_rf2<VC, VC, VC, POLY, POLY, POLY, 7, 7, 7, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c000_o7;
+extern prolongate_3d_rf2<VC, VC, CC, POLY, POLY, ENO, 7, 7, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c001_o7;
+extern prolongate_3d_rf2<VC, CC, VC, POLY, ENO, POLY, 7, 3, 7, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c010_o7;
+extern prolongate_3d_rf2<VC, CC, CC, POLY, ENO, ENO, 7, 3, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c011_o7;
+extern prolongate_3d_rf2<CC, VC, VC, ENO, POLY, POLY, 3, 7, 7, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c100_o7;
+extern prolongate_3d_rf2<CC, VC, CC, ENO, POLY, ENO, 3, 7, 3, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c101_o7;
+extern prolongate_3d_rf2<CC, CC, VC, ENO, ENO, POLY, 3, 3, 7, FB_LINEAR>
+    prolongate_poly_eno3lfb_3d_rf2_c110_o7;
+extern prolongate_3d_rf2<CC, CC, CC, ENO, ENO, ENO, 3, 3, 3, FB_LINEAR>
+    prolongate_poly_enoy3lfb_3d_rf2_c111_o7;
 #endif
 
 } // namespace CarpetX

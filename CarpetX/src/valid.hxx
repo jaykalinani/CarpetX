@@ -8,6 +8,7 @@
 #include <yaml-cpp/yaml.h>
 #include <zlib.h>
 
+#include <cstdint>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -16,7 +17,6 @@
 #include <vector>
 
 namespace CarpetX {
-using namespace std;
 
 struct valid_t {
   bool valid_int, valid_outer, valid_ghosts;
@@ -56,18 +56,18 @@ struct valid_t {
   }
 
   friend bool operator==(const valid_t &x, const valid_t &y) {
-    return make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) ==
-           make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
+    return std::make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) ==
+           std::make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
   }
   friend bool operator<(const valid_t &x, const valid_t &y) {
-    return make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) <
-           make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
+    return std::make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) <
+           std::make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
   }
 
   std::string explanation() const;
 
   friend std::ostream &operator<<(std::ostream &os, const valid_t v);
-  operator string() const;
+  operator std::string() const;
   friend YAML::Emitter &operator<<(YAML::Emitter &yaml, const valid_t v);
 };
 
@@ -93,14 +93,14 @@ namespace std {
 using namespace CarpetX;
 template <> struct equal_to<valid_t> {
   constexpr bool operator()(const valid_t &x, const valid_t &y) const {
-    return make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) ==
-           make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
+    return std::make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) ==
+           std::make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
   }
 };
 template <> struct less<valid_t> {
   constexpr bool operator()(const valid_t &x, const valid_t &y) const {
-    return make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) <
-           make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
+    return std::make_tuple(x.valid_int, x.valid_outer, x.valid_ghosts) <
+           std::make_tuple(y.valid_int, y.valid_outer, y.valid_ghosts);
   }
 };
 } // namespace std
@@ -108,21 +108,22 @@ namespace CarpetX {
 
 class why_valid_t {
   valid_t valid;
-  function<string()> why_int, why_outer, why_ghosts;
+  std::function<std::string()> why_int, why_outer, why_ghosts;
 
 public:
   // The constructor that doesn't give a reason should never be called
   why_valid_t() = delete;
-  why_valid_t(const function<string()> &why) : why_valid_t(false, why) {}
-  why_valid_t(bool b, const function<string()> &why)
+  why_valid_t(const std::function<std::string()> &why)
+      : why_valid_t(false, why) {}
+  why_valid_t(bool b, const std::function<std::string()> &why)
       : why_valid_t(valid_t(b), why) {}
-  why_valid_t(const valid_t &val, const function<string()> &why)
+  why_valid_t(const valid_t &val, const std::function<std::string()> &why)
       : valid(val), why_int(why), why_outer(why), why_ghosts(why) {}
 
   const valid_t &get() const { return valid; }
 
   void set(const valid_t &which, const valid_t &val,
-           const function<string()> &why) {
+           const std::function<std::string()> &why) {
     valid = (valid & ~which) | (val & which);
     if (which.valid_int)
       why_int = why;
@@ -131,29 +132,31 @@ public:
     if (which.valid_ghosts)
       why_ghosts = why;
   }
-  void set_all(const valid_t &val, const function<string()> &why) {
+  void set_all(const valid_t &val, const std::function<std::string()> &why) {
     set(valid_t(true), val, why);
   }
-  void set_int(bool b, const function<string()> &why) {
+  void set_int(bool b, const std::function<std::string()> &why) {
     set(make_valid_int(), valid_t(b), why);
   }
-  void set_outer(bool b, const function<string()> &why) {
+  void set_outer(bool b, const std::function<std::string()> &why) {
     set(make_valid_outer(), valid_t(b), why);
   }
-  void set_ghosts(bool b, const function<string()> &why) {
+  void set_ghosts(bool b, const std::function<std::string()> &why) {
     set(make_valid_ghosts(), valid_t(b), why);
   }
-  void set_invalid(const valid_t &which, const function<string()> &why) {
+  void set_invalid(const valid_t &which,
+                   const std::function<std::string()> &why) {
     set(which, valid_t(false), why);
   }
-  void set_valid(const valid_t &which, const function<string()> &why) {
+  void set_valid(const valid_t &which,
+                 const std::function<std::string()> &why) {
     set(which, valid_t(true), why);
   }
 
   std::string explanation() const;
 
   friend std::ostream &operator<<(std::ostream &os, const why_valid_t &why);
-  operator string() const;
+  operator std::string() const;
   friend YAML::Emitter &operator<<(YAML::Emitter &yaml, const why_valid_t &why);
 };
 
@@ -177,54 +180,118 @@ struct checksum_t {
     return !(x == y);
   }
 
-  friend ostream &operator<<(ostream &os, const checksum_t &x) {
-    return os << "checksum_t{where:" << x.where << ",crc:0x" << hex
-              << setfill('0') << setw(8) << x.crc << "}";
+  friend std::ostream &operator<<(std::ostream &os, const checksum_t &x) {
+    return os << "checksum_t{where:" << x.where << ",crc:0x" << std::hex
+              << std::setfill('0') << std::setw(8) << x.crc << "}";
   }
-  operator string() const {
-    ostringstream buf;
+  operator std::string() const {
+    std::ostringstream buf;
     buf << *this;
     return buf.str();
   }
 };
 
 struct tiletag_t {
-  int patch, level;
-  amrex::Box tilebox;
+  int patch, level, component;
   int gi, vi, tl;
   tiletag_t() = delete;
 
   friend bool operator==(const tiletag_t &x, const tiletag_t &y) {
-    return make_tuple(x.patch, x.level, x.tilebox, x.gi, x.vi, x.tl) ==
-           make_tuple(y.patch, y.level, y.tilebox, y.gi, y.vi, y.tl);
+    return std::make_tuple(x.patch, x.level, x.component, x.gi, x.vi, x.tl) ==
+           std::make_tuple(y.patch, y.level, y.component, y.gi, y.vi, y.tl);
   }
   friend bool operator<(const tiletag_t &x, const tiletag_t &y) {
-    return make_tuple(x.patch, x.level, x.tilebox, x.gi, x.vi, x.tl) <
-           make_tuple(y.patch, y.level, y.tilebox, y.gi, y.vi, y.tl);
+    return std::make_tuple(x.patch, x.level, x.component, x.gi, x.vi, x.tl) <
+           std::make_tuple(y.patch, y.level, y.component, y.gi, y.vi, y.tl);
   }
 
-  friend ostream &operator<<(ostream &os, const tiletag_t &x) {
+  friend std::ostream &operator<<(std::ostream &os, const tiletag_t &x) {
     return os << "tiletag_t{"
               << "patch:" << x.patch << ","
               << "level:" << x.level << ","
-              << "tilebox:" << x.tilebox << ","
+              << "component:" << x.component << ","
               << "gi:" << x.gi << ","
               << "vi:" << x.vi << ","
               << "tl:" << x.tl << "}";
   }
-  operator string() const {
-    ostringstream buf;
+  operator std::string() const {
+    std::ostringstream buf;
     buf << *this;
     return buf.str();
   }
 };
 
-typedef map<tiletag_t, checksum_t> checksums_t;
+typedef std::map<tiletag_t, checksum_t> checksums_t;
 
-checksums_t
-calculate_checksums(const vector<vector<vector<valid_t> > > &will_write);
+checksums_t calculate_checksums(
+    const std::vector<std::vector<std::vector<valid_t> > > &will_write);
 void check_checksums(const checksums_t &checksums,
-                     const std::function<string()> &where);
+                     const std::function<std::string()> &where);
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <typename T> struct ipoison_t;
+
+template <> struct ipoison_t<CCTK_COMPLEX> {
+#if defined CCTK_REAL_PRECISION_4
+  const std::uint32_t value[2] = {0xffc00000UL + 0xdead, 0xffc00000UL + 0xdead};
+#elif defined CCTK_REAL_PRECISION_8
+  const std::uint64_t value[2] = {0xfff8000000000000ULL + 0xdeadbeef,
+                                  0xfff8000000000000ULL + 0xdeadbeef};
+#endif
+  static_assert(sizeof value == sizeof(CCTK_COMPLEX));
+};
+
+template <> struct ipoison_t<CCTK_REAL> {
+#if defined CCTK_REAL_PRECISION_4
+  const std::uint32_t value[1] = {0xffc00000UL + 0xdead};
+#elif defined CCTK_REAL_PRECISION_8
+  const std::uint64_t value[1] = {0xfff8000000000000ULL + 0xdeadbeef};
+#endif
+  static_assert(sizeof value == sizeof(CCTK_REAL));
+};
+
+template <> struct ipoison_t<CCTK_INT> {
+  const std::uint32_t value[1] = {0xdeadbeef};
+  static_assert(sizeof value == sizeof(CCTK_INT));
+};
+
+template <typename T> class poison_value_t {
+public:
+  poison_value_t() = default;
+
+  CCTK_HOST CCTK_DEVICE bool is_poison(const T &val) const {
+    // no memcmp on CUDA :-(
+    // return std::memcmp(&val, &ipoison.value, sizeof(val)) == 0;
+
+    typedef decltype(ipoison.value) array_type;
+    typedef typename std::remove_extent<array_type>::type const_type;
+    const size_t array_size = std::extent<array_type>::value;
+
+    const_type *ival = reinterpret_cast<const_type *>(&val);
+    bool retval = false;
+    for (size_t i = 0; i < array_size; ++i)
+      if (ival[i] == ipoison.value[i])
+        retval = true;
+    return retval;
+  }
+
+  void set_to_poison(T &val) const {
+    std::memcpy(static_cast<void *>(&val), &ipoison.value, sizeof(val));
+  }
+
+  void set_to_poison(void *val, size_t count) const {
+    set_to_poison(reinterpret_cast<T *>(val), count);
+  }
+
+  void set_to_poison(T *val, size_t count) const {
+    for (size_t i = 0; i < count; ++i)
+      set_to_poison(val[i]);
+  }
+
+private:
+  const ipoison_t<T> ipoison;
+};
 
 } // namespace CarpetX
 

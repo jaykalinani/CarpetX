@@ -27,7 +27,6 @@
 #include <vector>
 
 namespace CarpetX {
-using namespace std;
 using namespace Arith;
 
 using Loop::dim;
@@ -72,7 +71,7 @@ class CactusAmrCore final : public amrex::AmrCore {
 
 public:
   bool cactus_is_initialized = false;
-  vector<bool> level_modified;
+  std::vector<bool> level_modified;
 
   CactusAmrCore();
   CactusAmrCore(int patch, const amrex::RealBox *rb, int max_level_in,
@@ -131,7 +130,7 @@ struct GHExt {
   };
 
   cctkGHptr global_cctkGH;
-  vector<cctkGHptr> level_cctkGHs; // [reflevel]
+  std::vector<cctkGHptr> level_cctkGHs; // [reflevel]
 
   struct CommonGroupData {
     std::string groupname;
@@ -142,7 +141,7 @@ struct GHExt {
     bool do_checkpoint; // whether to checkpoint
     bool do_restrict;   // whether to restrict
 
-    vector<vector<why_valid_t> > valid; // [time level][var index]
+    std::vector<std::vector<why_valid_t> > valid; // [time level][var index]
 
     // TODO: add poison_invalid and check_valid functions
 
@@ -153,13 +152,145 @@ struct GHExt {
   struct GlobalData {
     // all data that exists on all levels
 
+    class AnyTypeVector {
+
+    public:
+      // access to a single element of a AnyTypeVector
+      class AnyTypeScalarRef {
+      public:
+        AnyTypeScalarRef() = delete;
+        AnyTypeScalarRef(const AnyTypeVector &vect_, size_t idx_)
+            : _vect(vect_), _idx(idx_) {}
+
+      private:
+        const AnyTypeVector &_vect;
+        const size_t _idx;
+
+        friend YAML::Emitter &
+        operator<<(YAML::Emitter &yaml,
+                   const AnyTypeScalarRef &anytypescalarref);
+        friend std::ostream &operator<<(std::ostream &os,
+                                        const AnyTypeScalarRef &scalar);
+      };
+
+      AnyTypeVector() : _type(-1), _typesize(-1), _count(0), _data(nullptr) {};
+      AnyTypeVector(int type_, size_t count_)
+          : _type(-1), _typesize(-1), _count(0), _data(nullptr) {
+        alloc(type_, count_);
+        assert(_type == type_);
+        assert(_typesize != -1);
+        assert(_count == count_);
+        assert(_data != nullptr);
+      };
+      // Noncopyable for now
+      AnyTypeVector(const AnyTypeVector &) = delete;
+      AnyTypeVector &operator=(const AnyTypeVector &) = delete;
+      AnyTypeVector &operator=(AnyTypeVector &&other) {
+        swap(other);
+        return *this;
+      }
+      AnyTypeVector(AnyTypeVector &&other)
+          : _type(other._type), _typesize(other._typesize),
+            _count(other._count), _data(other._data) {
+        other._type = -1;
+        other._typesize = -1;
+        other._count = 0;
+        other._data = nullptr;
+      }
+      void swap(AnyTypeVector &other) {
+        std::swap(this->_type, other._type);
+        std::swap(this->_typesize, other._typesize);
+        std::swap(this->_count, other._count);
+        std::swap(this->_data, other._data);
+      }
+
+      ~AnyTypeVector() {
+        if (_data != nullptr) {
+          assert(_type != -1);
+          assert(_typesize != -1);
+          amrex::The_Arena()->free(_data);
+          _type = -1;
+          _typesize = -1;
+          _count = 0;
+          _data = nullptr;
+        }
+        assert(_type == -1);
+        assert(_typesize == -1);
+        assert(_count == 0);
+        assert(_data == nullptr);
+      };
+
+      void alloc(int type_, size_t count_) {
+        assert(type_ == CCTK_VARIABLE_INT || type_ == CCTK_VARIABLE_REAL ||
+               type_ == CCTK_VARIABLE_COMPLEX);
+
+        assert(_type == -1);
+        assert(_typesize == -1);
+        assert(_count == 0);
+        assert(_data == nullptr);
+
+        _type = type_;
+        _typesize = CCTK_VarTypeSize(_type);
+        assert(_typesize > 0);
+        _count = count_;
+        _data = amrex::The_Arena()->alloc(_typesize * _count);
+      }
+
+      void free() {
+        assert(_type != -1);
+        assert(_typesize != -1);
+        assert(_data != nullptr);
+        amrex::The_Arena()->free(_data);
+        _type = -1;
+        _typesize = -1;
+        _count = 0;
+        _data = nullptr;
+      }
+
+      int type() const { return _type; };
+      int typesize() const { return _typesize; };
+
+      const void *data_at(size_t i) const {
+#ifdef CCTK_DEBUG
+        if (i >= _count) {
+          CCTK_VERROR("invalid index %zd exceeds %zd", i, _count);
+        }
+#endif
+        assert(i < _count);
+        return (char *)_data + i * _typesize;
+      };
+
+      void *data_at(size_t i) {
+#ifdef CCTK_DEBUG
+        if (i >= _count) {
+          CCTK_VERROR("invalid index %zu exceeds %zu", i, _count);
+        }
+#endif
+        assert(i < _count);
+        return (char *)_data + i * _typesize;
+      };
+
+      AnyTypeScalarRef operator[](size_t idx) const {
+        return AnyTypeScalarRef(*this, idx);
+      }
+
+      size_t size() const { return _count; };
+
+      friend YAML::Emitter &operator<<(YAML::Emitter &yaml,
+                                       const AnyTypeVector &anytypevector);
+
+    private:
+      int _type, _typesize;
+      size_t _count;
+      void *_data;
+    };
+
     // For subcycling in time, there really should be one copy of each
     // integrated grid scalar per level. We don't do that yet; instead,
     // we assume that grid scalars only hold "analysis" data.
 
     struct ArrayGroupData : public CommonGroupData {
-      vector<vector<CCTK_REAL> >
-          data; // [time level][var index + grid point index]
+      vector<AnyTypeVector> data; // [time level][var index + grid point index]
       int array_size;
       int dimension;
       int activetimelevels;
@@ -190,7 +321,8 @@ struct GHExt {
                                        const ArrayGroupData &arraygroupdata);
     };
     // TODO: right now this is sized for the total number of groups
-    vector<unique_ptr<ArrayGroupData> > arraygroupdata; // [group index]
+    std::vector<std::unique_ptr<ArrayGroupData> >
+        arraygroupdata; // [group index]
 
     friend YAML::Emitter &operator<<(YAML::Emitter &yaml,
                                      const GlobalData &globaldata);
@@ -208,11 +340,11 @@ struct GHExt {
 
     int patch;
 
-    array<array<symmetry_t, dim>, 2> symmetries;
+    std::array<std::array<symmetry_t, dim>, 2> symmetries;
 
     // AMReX grid structure
     // TODO: convert this from unique_ptr to optional
-    unique_ptr<CactusAmrCore> amrcore;
+    std::unique_ptr<CactusAmrCore> amrcore;
 
     struct LevelData {
       LevelData() = delete;
@@ -223,7 +355,7 @@ struct GHExt {
 
       LevelData(const int patch, const int level, const amrex::BoxArray &ba,
                 const amrex::DistributionMapping &dm,
-                const function<string()> &why);
+                const std::function<std::string()> &why);
 
       int patch, level;
 
@@ -237,10 +369,10 @@ struct GHExt {
       // Fabamrex::ArrayBase object holding a cell-centred BoxArray for
       // iterating over grid functions. This stores the grid structure
       // and its distribution over all processes, but holds no data.
-      unique_ptr<amrex::FabArrayBase> fab;
+      std::unique_ptr<amrex::FabArrayBase> fab;
 
       cctkGHptr patch_cctkGH;
-      vector<cctkGHptr> local_cctkGHs; // [component]
+      std::vector<cctkGHptr> local_cctkGHs; // [component]
 
       cGH *get_patch_cctkGH() const { return patch_cctkGH.get(); }
       cGH *get_local_cctkGH(const int component) const {
@@ -256,30 +388,30 @@ struct GHExt {
 
         GroupData(int patch, int level, int gi, const amrex::BoxArray &ba,
                   const amrex::DistributionMapping &dm,
-                  const function<string()> &why);
+                  const std::function<std::string()> &why);
 
         int patch, level;
 
-        array<int, dim> indextype;
-        array<int, dim> nghostzones;
+        std::array<int, dim> indextype;
+        std::array<int, dim> nghostzones;
 
-        array<array<boundary_t, dim>, 2> boundaries;
+        std::array<std::array<boundary_t, dim>, 2> boundaries;
         bool all_faces_have_symmetries_or_boundaries() const;
-        vector<array<int, dim> > parities;
-        vector<CCTK_REAL> dirichlet_values;
-        vector<CCTK_REAL> robin_values;
+        std::vector<array<int, dim> > parities;
+        std::vector<CCTK_REAL> dirichlet_values;
+        std::vector<CCTK_REAL> robin_values;
         amrex::Vector<amrex::BCRec> bcrecs;
 
         // Apply outer (physical) boundary conditions to a MultiFab
         void apply_boundary_conditions(amrex::MultiFab &mfab) const;
 
         // each amrex::MultiFab has numvars components
-        vector<unique_ptr<amrex::MultiFab> > mfab; // [time level]
+        std::vector<std::unique_ptr<amrex::MultiFab> > mfab; // [time level]
 
         // flux register between this and the next coarser level
-        unique_ptr<amrex::FluxRegister> freg;
+        std::unique_ptr<amrex::FluxRegister> freg;
         // associated flux group indices
-        array<int, dim> fluxes; // [dir]
+        std::array<int, dim> fluxes; // [dir]
 
         // CarpetX can allocate and free (temporary) multifabs that
         // are associated with a Cactus grid function group. These
@@ -302,17 +434,17 @@ struct GHExt {
                                          const GroupData &groupdata);
       };
       // TODO: right now this is sized for the total number of groups
-      vector<unique_ptr<GroupData> > groupdata; // [group index]
+      std::vector<unique_ptr<GroupData> > groupdata; // [group index]
 
       friend YAML::Emitter &operator<<(YAML::Emitter &yaml,
                                        const LevelData &leveldata);
     };
-    vector<LevelData> leveldata; // [reflevel]
+    std::vector<LevelData> leveldata; // [reflevel]
 
     friend YAML::Emitter &operator<<(YAML::Emitter &yaml,
                                      const PatchData &patchdata);
   };
-  vector<PatchData> patchdata; // [patch]
+  std::vector<PatchData> patchdata; // [patch]
 
   int num_patches() const { return patchdata.size(); }
   int num_levels() const {
@@ -339,12 +471,12 @@ struct GHExt {
   }
 
   friend YAML::Emitter &operator<<(YAML::Emitter &yaml, const GHExt &ghext);
-  friend ostream &operator<<(ostream &os, const GHExt &ghext);
+  friend std::ostream &operator<<(std::ostream &os, const GHExt &ghext);
 };
 
-extern unique_ptr<GHExt> ghext;
+extern std::unique_ptr<GHExt> ghext;
 
-amrex::Interpolater *get_interpolator(const array<int, dim> indextype);
+amrex::Interpolater *get_interpolator(const std::array<int, dim> indextype);
 
 } // namespace CarpetX
 

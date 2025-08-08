@@ -17,11 +17,14 @@ jobs:
   download-build-test:
     strategy:
       matrix:
-        accelerator: [cpu, cuda, rocm]
+        accelerator: [cpu, cuda, rocm, oneapi]
         real-precision: [real32, real64]
         mode: [debug, optimize]
         exclude:
           - {accelerator: rocm, real-precision: real32}
+          - {accelerator: oneapi, real-precision: real32}
+          - {accelerator: oneapi, mode: debug} # uses too much disk space?
+          - {accelerator: rocm, mode: debug} # uses too much memory?
           - {real-precision: real32, mode: optimize}
     env:
       ACCELERATOR: ${{matrix.accelerator}}
@@ -35,14 +38,8 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Check out the repository under $GITHUB_WORKSPACE, so our job can access it
-      - uses: actions/checkout@v3
-          
-      # # Check out the documentation and test results
-      # - uses: actions/checkout@v3
-      #   with:
-      #     ref: gh-pages
-      #     path: gh-pages
-          
+      - uses: actions/checkout@v4
+
       - name: Log the triggering commit
         run: echo ${{github.event.client_payload.trigger}}
 
@@ -51,14 +48,8 @@ jobs:
 
       - name: Build Cactus
         run: /bin/bash $GITHUB_WORKSPACE/scripts/build.sh
-      
+
       - name: Test Cactus
-        # We cannot run with cuda nor with rocm. Debug builds run too slowly.
-        if: ${{matrix.accelerator != 'cuda' && matrix.accelerator != 'rocm' && matrix.mode != 'debug'}}
+        # We cannot run on accelerators. Single precision output is not accurate enough. Debug builds run too slowly.
+        if: ${{matrix.accelerator == 'cpu' && matrix.real-precision == 'real64' && matrix.mode == 'optimize'}}
         run: /bin/bash $GITHUB_WORKSPACE/scripts/test.sh
-      
-      # Set exit code based on test status
-      - name: Set exit code
-        # Only look at the test results for `carpetx-cpu-real64` runs
-        if: ${{matrix.accelerator == 'cpu' && matrix.real-precision == 'real64' && matrix.mode == 'optimize' && env.TESTS_FAILED == 'True'}}
-        run: exit 1

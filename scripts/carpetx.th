@@ -701,12 +701,14 @@ CarpetX/Algo
 CarpetX/Arith
 CarpetX/BoxInBox
 CarpetX/CarpetX
+CarpetX/CarpetXRegrid
 CarpetX/CoordinatesX
 CarpetX/Derivs
 CarpetX/ErrorEstimator
 CarpetX/FluxWaveToyX
 CarpetX/HydroBaseX
 CarpetX/Loop
+CarpetX/MovingBoxToy
 CarpetX/ODESolvers
 CarpetX/PDESolvers
 CarpetX/PoissonX

@@ -6,24 +6,37 @@
 #     docker build --build-arg real_precision=real32 --file carpetx-cuda.dockerfile --tag einsteintoolkit/carpetx:cuda-real32 .
 #     docker push einsteintoolkit/carpetx:cuda-real32
 
-FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+# FROM nvidia/cuda:12.6.2-devel-ubuntu24.04
+FROM nvidia/cuda:12.6.3-devel-ubuntu24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANGUAGE=en_US.en \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
 
 RUN mkdir /cactus
 WORKDIR /cactus
 
 # Install system packages
 # - Boost on Ubuntu requires OpenMPI
-ENV DEBIAN_FRONTEND=noninteractive
+#        elfutils
+#        python2
 RUN apt-get update && \
     apt-get --yes --no-install-recommends install \
-        build-essential \
         ca-certificates \
+        clang-format \
         cmake \
         cvs \
+        diffutils \
         g++ \
+        gcc \
+        gdb \
         gfortran \
         git \
+        hdf5-filter-plugin-zfp-serial \
         hdf5-tools \
+        hwloc-nox \
+        language-pack-en \
         less \
         libblosc-dev \
         libboost-all-dev \
@@ -36,13 +49,20 @@ RUN apt-get update && \
         libopenblas-dev \
         libopenmpi-dev \
         libpetsc-real-dev \
+        libprotobuf-dev \
+        libtool \
         libudev-dev \
         libyaml-cpp-dev \
+        libzfp-dev \
+        libzstd-dev \
+        locales \
+        m4 \
         meson \
         ninja-build \
+        numactl \
         perl \
-        pkg-config \
-        python2 \
+        pkgconf \
+        protobuf-compiler \
         python3 \
         python3-pip \
         python3-requests \
@@ -54,19 +74,102 @@ RUN apt-get update && \
         && \
     rm -rf /var/lib/apt/lists/*
 
-# Install ADIOS2
-# ADIOS2 is a parallel I/O library, comparable to HDF5
+# # Install HPCToolkit
+# # Install this first because it is expensive to build
+# RUN mkdir src && \
+#     (cd src && \
+#     wget https://github.com/spack/spack/archive/refs/tags/v0.23.0.tar.gz && \
+#     tar xzf v0.23.0.tar.gz && \
+#     export SPACK_ROOT="$(pwd)/spack-0.23.0" && \
+#     mkdir -p "${HOME}/.spack" && \
+#     echo 'config: {install_tree: {root: /spack}}' >"${HOME}/.spack/config.yaml" && \
+#     . ${SPACK_ROOT}/share/spack/setup-env.sh && \
+#     spack external find \
+#         autoconf \
+#         automake \
+#         cmake \
+#         cuda \
+#         diffutils \
+#         elfutils \
+#         gmake \
+#         libtool \
+#         m4 \
+#         meson \
+#         ninja \
+#         numactl \
+#         perl \
+#         pkgconf \
+#         python \
+#     && \
+#     spack install --fail-fast hpctoolkit +cuda ~viewer && \
+#     spack view --dependencies no hardlink /hpctoolkit hpctoolkit && \
+#     true) && \
+#     rm -rf src "${HOME}/.spack"
+
+# Install blosc2
+# blosc2 is a compression library, comparable to zlib
 RUN mkdir src && \
     (cd src && \
-    wget https://github.com/ornladios/ADIOS2/archive/refs/tags/v2.9.1.tar.gz && \
-    tar xzf v2.9.1.tar.gz && \
-    cd ADIOS2-2.9.1 && \
-    cmake -B build -G Ninja -S . \
+    wget https://github.com/Blosc/c-blosc2/archive/refs/tags/v2.15.2.tar.gz && \
+    tar xzf v2.15.2.tar.gz && \
+    cd c-blosc2-2.15.2 && \
+    cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_BENCHMARKS=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_FUZZERS=OFF \
+        -DBUILD_STATIC=OFF \
+        -DBUILD_TESTS=OFF \
+        && \
+    cmake --build build && \
+    cmake --install build && \
+    true) && \
+    rm -rf src
+
+# Install MGARD
+# MGARD is a lossy compression library
+# Note: -DMGARD_ENABLE_CUDA=ON requires nvcomp with a restrictive licence
+RUN mkdir src && \
+    (cd src && \
+    wget https://github.com/CODARcode/MGARD/archive/refs/tags/1.5.2.tar.gz && \
+    tar xzf 1.5.2.tar.gz && \
+    cd MGARD-1.5.2 && \
+    cmake -B build -G Ninja \
+        -DBUILD_TESTING=OFF \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_PREFIX_PATH=/usr/local \
+        -DMGARD_ENABLE_OPENMP=ON \
+        -DMGARD_ENABLE_SERIAL=ON \
+        && \
+    cmake --build build && \
+    cmake --install build && \
+    true) && \
+    rm -rf src
+
+# Install ADIOS2
+# ADIOS2 is a parallel I/O library, comparable to HDF5
+# - depends on blosc2
+# - depends on MGARD
+RUN mkdir src && \
+    (cd src && \
+    wget https://github.com/ornladios/ADIOS2/archive/refs/tags/v2.10.2.tar.gz && \
+    tar xzf v2.10.2.tar.gz && \
+    cd ADIOS2-2.10.2 && \
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_SHARED_LIBS=ON \
         -DBUILD_TESTING=OFF \
         -DADIOS2_BUILD_EXAMPLES=OFF \
+        -DADIOS2_Blosc2_PREFER_SHARED=ON \
+        -DADIOS2_USE_BZip2=ON \
+        -DADIOS2_USE_Blosc2=ON \
         -DADIOS2_USE_Fortran=OFF \
+        -DADIOS2_USE_HDF5=ON \
+        -DADIOS2_USE_MGARD=ON \
+        -DADIOS2_USE_ZFP=ON \
         && \
     cmake --build build && \
     cmake --install build && \
@@ -78,10 +181,14 @@ RUN mkdir src && \
 # - depends on yaml-cpp
 RUN mkdir src && \
     (cd src && \
-    wget https://github.com/eschnett/asdf-cxx/archive/refs/tags/version/7.2.1.tar.gz && \
-    tar xzf 7.2.1.tar.gz && \
-    cd asdf-cxx-version-7.2.1 && \
-    cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    wget https://github.com/eschnett/asdf-cxx/archive/refs/tags/version/7.3.2.tar.gz && \
+    tar xzf 7.3.2.tar.gz && \
+    cd asdf-cxx-version-7.3.2 && \
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_SHARED_LIBS=ON \
+        && \
     cmake --build build && \
     cmake --install build && \
     true) && \
@@ -95,7 +202,7 @@ RUN mkdir src && \
     wget https://github.com/agenium-scale/nsimd/archive/refs/tags/v3.0.1.tar.gz && \
     tar xzf v3.0.1.tar.gz && \
     cd nsimd-3.0.1 && \
-    cmake -B build -G Ninja -S . \
+    cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -Dsimd=AVX2 \
@@ -105,19 +212,25 @@ RUN mkdir src && \
     true) && \
     rm -rf src
 
+COPY patches/openPMD-api.patch /cactus/patches/
+
 # Install openPMD-api
 # openPMD-api defines a standard for laying out AMR data in a file
 # - depends on ADIOS2
 RUN mkdir src && \
     (cd src && \
-    wget https://github.com/openPMD/openPMD-api/archive/refs/tags/0.15.2.tar.gz && \
-    tar xzf 0.15.2.tar.gz && \
-    cd openPMD-api-0.15.2 && \
-    cmake -B build -G Ninja -S . \
+    wget https://github.com/openPMD/openPMD-api/archive/refs/tags/0.16.0.tar.gz && \
+    tar xzf 0.16.0.tar.gz && \
+    cd openPMD-api-0.16.0 && \
+    patch -p1 </cactus/patches/openPMD-api.patch && \
+    rm /cactus/patches/openPMD-api.patch && \
+    cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DBUILD_TESTING=OFF \
         -DBUILD_EXAMPLES=OFF \
+        -DBUILD_TESTING=OFF \
+        -DopenPMD_BUILD_SHARED_LIBS=ON \
+        -DopenPMD_USE_MPI=ON \
         && \
     cmake --build build && \
     cmake --install build && \
@@ -128,9 +241,9 @@ RUN mkdir src && \
 # RePrimAnd is a physics package for nuclear equations of state
 RUN mkdir src && \
     (cd src && \
-    wget https://github.com/wokast/RePrimAnd/archive/refs/tags/v1.6.tar.gz && \
-    tar xzf v1.6.tar.gz && \
-    cd RePrimAnd-1.6 && \
+    wget https://github.com/wokast/RePrimAnd/archive/refs/tags/v1.7.tar.gz && \
+    tar xzf v1.7.tar.gz && \
+    cd RePrimAnd-1.7 && \
     meson build --buildtype=release --prefix=/usr/local && \
     ninja -C build && \
     ninja -C build install && \
@@ -141,14 +254,16 @@ RUN mkdir src && \
 # Silo defines a standard for laying out AMR data in a file
 RUN mkdir src && \
     (cd src && \
-    wget https://github.com/LLNL/Silo/releases/download/v4.11/silo-4.11.tar.gz && \
-    tar xzf silo-4.11.tar.gz && \
-    cd silo-4.11 && \
+    wget https://github.com/LLNL/Silo/releases/download/4.11.1/silo-4.11.1.tar.xz && \
+    tar xJf silo-4.11.1.tar.xz && \
+    cd silo-4.11.1 && \
     mkdir build && \
     cd build && \
     ../configure \
         --disable-fortran \
+        --disable-static \
         --enable-optimization \
+        --enable-shared \
         --with-hdf5=/usr/lib/x86_64-linux-gnu/hdf5/serial/include,/usr/lib/x86_64-linux-gnu/hdf5/serial/lib \
         --prefix=/usr/local \
         && \
@@ -161,12 +276,17 @@ RUN mkdir src && \
 # SimulationIO is an I/O library like HDF5
 # - depends on asdf-cxx
 # - depends on yaml-cpp
+# Currently disabling ASDF because there is a confusion with C++11/17 standards
 RUN mkdir src && \
     (cd src && \
     wget https://github.com/eschnett/SimulationIO/archive/refs/tags/version/9.0.3.tar.gz && \
     tar xzf 9.0.3.tar.gz && \
     cd SimulationIO-version-9.0.3 && \
-    cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DENABLE_ASDF_CXX=OFF \
+        && \
     cmake --build build && \
     cmake --install build && \
     true) && \
@@ -179,7 +299,11 @@ RUN mkdir src && \
     wget https://github.com/astro-informatics/ssht/archive/v1.5.2.tar.gz && \
     tar xzf v1.5.2.tar.gz && \
     cd ssht-1.5.2 && \
-    cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_TESTING=OFF \
+        && \
     cmake --build build && \
     cmake --install build && \
     true) && \
@@ -194,15 +318,15 @@ ARG real_precision=real64
 # Should we keep the AMReX source tree around for debugging?
 RUN mkdir src && \
     (cd src && \
-    wget https://github.com/AMReX-Codes/amrex/archive/23.09.tar.gz && \
-    tar xzf 23.09.tar.gz && \
-    cd amrex-23.09 && \
+    wget https://github.com/AMReX-Codes/amrex/archive/24.12.tar.gz && \
+    tar xzf 24.12.tar.gz && \
+    cd amrex-24.12 && \
     case $real_precision in \
         real32) precision=SINGLE;; \
         real64) precision=DOUBLE;; \
         *) exit 1;; \
     esac && \
-    cmake -B build -G Ninja -S . \
+    cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DBUILD_SHARED_LIBS=ON \
@@ -218,3 +342,7 @@ RUN mkdir src && \
     cmake --install build && \
     true) && \
     rm -rf src
+
+# Find libraries in /usr/local/lib64
+RUN echo /usr/local/lib64 >/etc/ld.so.conf.d/usr-local-lib64.conf && \
+    ldconfig

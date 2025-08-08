@@ -16,7 +16,6 @@
 #include <vector>
 
 namespace CarpetX {
-using namespace std;
 using namespace Loop;
 
 int Initialise(tFleshConfig *config);
@@ -44,64 +43,54 @@ struct active_levels_t {
   // active_levels_t() = delete;
 
   active_levels_t(const int min_level, const int max_level, const int min_patch,
-                  const int max_patch)
-      : min_level(min_level), max_level(max_level), min_patch(min_patch),
-        max_patch(max_patch) {
-    assert(min_level >= 0);
-    assert(max_level <= ghext->num_levels());
-    assert(min_patch >= 0);
-    assert(max_patch <= ghext->num_patches());
-  }
-  active_levels_t(const int min_level, const int max_level)
-      : active_levels_t(min_level, max_level, 0, ghext->num_patches()) {}
-  active_levels_t() : active_levels_t(0, ghext->num_levels()) {}
+                  const int max_patch);
+  active_levels_t(const int min_level, const int max_level);
+  active_levels_t();
 
 private:
-  void assert_consistent_iterations() const {
-    rat64 good_iteration = -1;
-    for (int level = min_level; level < max_level; ++level) {
-      for (int patch = min_patch; patch < max_patch; ++patch) {
-        const auto &patchdata = ghext->patchdata.at(patch);
-        if (level < int(patchdata.leveldata.size())) {
-          const auto &leveldata = patchdata.leveldata.at(level);
-          const auto &iteration = leveldata.iteration;
-          if (good_iteration == -1)
-            good_iteration = iteration;
-          assert(iteration == good_iteration);
-        }
-      }
-    }
-  }
+  void assert_consistent_iterations() const;
 
 public:
-  // Loop over all active patches of all active levels
-  template <typename F> void loop(F f) const {
-    assert_consistent_iterations();
-    for (int level = min_level; level < max_level; ++level) {
-      for (int patch = min_patch; patch < max_patch; ++patch) {
-        auto &patchdata = ghext->patchdata.at(patch);
-        if (level < int(patchdata.leveldata.size()))
-          f(patchdata.leveldata.at(level));
-      }
-    }
+  // Loop over all active patches of all active levels from coarsest
+  // to finest
+  void loop_coarse_to_fine(
+      const std::function<void(GHExt::PatchData::LevelData &level)> &kernel)
+      const;
+
+  // Loop over all active patches of all active levels from finest to
+  // coarsest
+  void loop_fine_to_coarse(
+      const std::function<void(GHExt::PatchData::LevelData &level)> &kernel)
+      const;
+
+  // Loop over all active patches of all active levels serially
+  void loop_serially(
+      const std::function<void(GHExt::PatchData::LevelData &level)> &kernel)
+      const {
+    loop_coarse_to_fine(kernel);
   }
 
-  // Loop over all active patches of all active levels
-  template <typename F> void loop_reverse(F f) const {
-    assert_consistent_iterations();
-    for (int level = max_level - 1; level >= min_level; --level) {
-      for (int patch = min_patch; patch < max_patch; ++patch) {
-        auto &patchdata = ghext->patchdata.at(patch);
-        if (level < int(patchdata.leveldata.size()))
-          f(patchdata.leveldata.at(level));
-      }
-    }
-  }
+  // // Loop over all active patches of all active levels in parallel
+  // void loop_parallel(
+  //     const std::function<void(GHExt::PatchData::LevelData &level)> &kernel)
+  //     const;
+
+  // Loop over all components of all active patches of all active
+  // levels in parallel
+  void loop_parallel(
+      const std::function<void(int patch, int level, int index, int component,
+                               const cGH *cctkGH)> &kernel) const;
+
+  // Loop over all components of all active patches of all active
+  // levels serially
+  void loop_serially(
+      const std::function<void(int patch, int level, int index, int component,
+                               const cGH *cctkGH)> &kernel) const;
 };
 
 // The levels CallFunction should traverse
 // TODO: Move this into ghext
-extern optional<active_levels_t> active_levels;
+extern std::optional<active_levels_t> active_levels;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -173,8 +162,8 @@ struct GridPtrDesc : GridDesc {
 
 struct GridPtrDesc1 : GridDesc {
   amrex::Dim3 cactus_offset;
-  array<int, dim> gimin, gimax;
-  array<int, dim> gash;
+  std::array<int, dim> gimin, gimax;
+  std::array<int, dim> gash;
 
   GridPtrDesc1() = delete;
   GridPtrDesc1(const GridPtrDesc1 &) = delete;
@@ -199,7 +188,7 @@ struct GridPtrDesc1 : GridDesc {
     return GF3D1<T>(ptr(vars, vi), gimin, gimax, gash);
   }
 
-  friend ostream &operator<<(ostream &os, const GridPtrDesc1 &p) {
+  friend std::ostream &operator<<(std::ostream &os, const GridPtrDesc1 &p) {
     os << "GridPtrDesc1{" << (const GridDescBase &)p << ", "
        << "cactus_offset:"
        << "{" << p.cactus_offset.x << "," << p.cactus_offset.y << ","
@@ -241,15 +230,6 @@ void leave_local_mode(cGH *restrict cctkGH,
                       const GHExt::PatchData::LevelData &restrict leveldata,
                       const MFPointer &mfp);
 
-// Loop over all components of a single patch and level
-void loop_over_components(
-    amrex::FabArrayBase &fab,
-    const std::function<void(int index, int component)> &component_kernel);
-// Loop over all components of several patches and levels
-void loop_over_components(
-    const active_levels_t &active_levels,
-    const std::function<void(int patch, int level, int index, int component,
-                             const cGH *cctkGH)> &component_kernel);
 void synchronize();
 
 // These functions are defined in valid.cxx. These prototypes should
@@ -273,19 +253,15 @@ void warn_if_invalid(const GHExt::GlobalData::ArrayGroupData &groupdata, int vi,
 
 enum class nan_handling_t { allow_nans, forbid_nans };
 
-void poison_invalid(const GHExt::PatchData::LevelData &leveldata,
-                    const GHExt::PatchData::LevelData::GroupData &groupdata,
-                    int vi, int tl);
-void check_valid(const GHExt::PatchData::LevelData &leveldata,
-                 const GHExt::PatchData::LevelData::GroupData &groupdata,
-                 int vi, int tl, nan_handling_t nan_handling,
-                 const function<string()> &msg);
+void poison_invalid_gf(const active_levels_t &active_levels, int gi, int vi,
+                       int tl);
+void poison_invalid_ga(int gi, int vi, int tl);
 
-void poison_invalid(const GHExt::GlobalData::ArrayGroupData &groupdata, int vi,
-                    int tl);
-void check_valid(const GHExt::GlobalData::ArrayGroupData &groupdata, int vi,
-                 int tl, nan_handling_t nan_handling,
-                 const function<string()> &msg);
+void check_valid_gf(const active_levels_t &active_levels, int gi, int vi,
+                    int tl, nan_handling_t nan_handling,
+                    const function<string()> &msg);
+void check_valid_ga(int gi, int vi, int tl, nan_handling_t nan_handling,
+                    const function<string()> &msg);
 
 } // namespace CarpetX
 

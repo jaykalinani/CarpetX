@@ -71,18 +71,29 @@ CCTK_INT ncells_z "Number of grid cells"
 
 RESTRICTED:
 
-BOOLEAN periodic_x "Periodic"
+BOOLEAN periodic "Periodic boundary conditions"
 {
-} no
+  "yes" :: "must be set for any periodic_x,y,z to be effective"
+  "no"  :: "no periodicity"
+} "no"
 
-BOOLEAN periodic_y "Periodic"
+BOOLEAN periodic_x "Periodic boundary conditions in x-direction"
 {
-} no
+  "yes" :: "periodic in x direction, requires periodic=yes as well"
+  "no"  :: "not periodic in x direction"
+} "yes"
 
-BOOLEAN periodic_z "Periodic"
+BOOLEAN periodic_y "Periodic boundary conditions in y-direction"
 {
-} no
+  "yes" :: "periodic in y direction, requires periodic=yes as well"
+  "no"  :: "not periodic in y direction"
+} "yes"
 
+BOOLEAN periodic_z "Periodic boundary conditions in z-direction"
+{
+  "yes" :: "periodic in z direction, requires periodic=yes as well"
+  "no"  :: "not periodic in z direction"
+} "yes"
 
 
 PRIVATE:
@@ -297,56 +308,76 @@ STRING robin_upper_z_vars "Override boundary condition at upper z boundary"
 
 
 
-CCTK_INT blocking_factor_x "Blocking factor"
+CCTK_INT blocking_factor_x "Blocking factor" STEERABLE=recover
 {
   1:* :: ""
 } 8
 
-CCTK_INT blocking_factor_y "Blocking factor"
+CCTK_INT blocking_factor_y "Blocking factor" STEERABLE=recover
 {
   1:* :: ""
 } 8
 
-CCTK_INT blocking_factor_z "Blocking factor"
+CCTK_INT blocking_factor_z "Blocking factor" STEERABLE=recover
 {
   1:* :: "must be a power of 2"
 } 8
 
-CCTK_REAL grid_efficiency "Minimum AMR grid efficiency"
+CCTK_REAL grid_efficiency "Minimum AMR grid efficiency" STEERABLE=recover
 {
   0.0:* :: ""
 } 0.7
 
-CCTK_INT max_grid_size_x "Maximum grid size"
+CCTK_INT max_grid_size_x "Maximum grid size" STEERABLE=always
 {
   1:* :: "must be a multiple of the blocking factor"
 } 32
 
-CCTK_INT max_grid_size_y "Maximum grid size"
+CCTK_INT max_grid_size_y "Maximum grid size" STEERABLE=always
 {
   1:* :: "must be a multiple of the blocking factor"
 } 32
 
-CCTK_INT max_grid_size_z "Maximum grid size"
+CCTK_INT max_grid_size_z "Maximum grid size" STEERABLE=always
 {
   1:* :: "must be a multiple of the blocking factor"
 } 32
 
-BOOLEAN refine_grid_layout "Ensure that each MPI process has at least one grid"
+CCTK_INT max_grid_sizes_x[20] "Maximum grid size" STEERABLE=always
+{
+  -1 :: "use value from max_grid_size_x"
+  1:* :: "must be a multiple of the blocking factor"
+} -1
+
+CCTK_INT max_grid_sizes_y[20] "Maximum grid size" STEERABLE=always
+{
+  -1 :: "use value from max_grid_size_y"
+  1:* :: "must be a multiple of the blocking factor"
+} -1
+
+CCTK_INT max_grid_sizes_z[20] "Maximum grid size" STEERABLE=always
+{
+  -1 :: "use value from max_grid_size_z"
+  1:* :: "must be a multiple of the blocking factor"
+} -1
+
+
+
+BOOLEAN refine_grid_layout "Ensure that each MPI process has at least one grid" STEERABLE=recover
 {
 } yes
 
-CCTK_INT max_tile_size_x "Maximum tile size"
+CCTK_INT max_tile_size_x "Maximum tile size" STEERABLE=recover
 {
   1:* :: ""
 } 1024000
 
-CCTK_INT max_tile_size_y "Maximum tile size"
+CCTK_INT max_tile_size_y "Maximum tile size" STEERABLE=recover
 {
   1:* :: ""
 } 16
 
-CCTK_INT max_tile_size_z "Maximum tile size"
+CCTK_INT max_tile_size_z "Maximum tile size" STEERABLE=recover
 {
   1:* :: ""
 } 32
@@ -358,12 +389,15 @@ CCTK_INT max_num_levels "Maximum number of refinement levels"
   1:* :: ""
 } 1
 
+
+#TODO: move to CarpetRegridX
 CCTK_INT regrid_every "Regridding interval" STEERABLE=always
 {
   0 :: "never"
   1:* :: "every that many iterations"
 } 0
 
+#TODO: eliminate in favor of regrid_error being a true/false field
 CCTK_REAL regrid_error_threshold "Regridding error threshold" STEERABLE=always
 {
   0.0:* :: ""
@@ -398,17 +432,23 @@ KEYWORD prolongation_type "Prolongation type"
 {
   "interpolate" :: "interpolate between data points"
   "conservative" :: "interpolate cell averages, ensuring conservation"
-  "ddf" :: "interpolate in vertex centred and conserve in cell centred directions"
-  "ddf-eno" :: "interpolate in vertex centred and ENO-conserve in cell centred directions"
-  "ddf-hermite" :: "Hermite-interpolate in vertex centred and conserve in cell centred directions"
+  "ddf" :: "interpolate in vertex centred and conserve (with one order lower) in cell centred directions"
+  "eno" :: "interpolate in vertex centred and minmod-conserve in cell centred directions"
+  "minmod" :: "interpolate in vertex centred and ENO-conserve in cell centred directions"
+  "hermite" :: "Hermite-interpolate in vertex centred and conserve in cell centred directions"
   "natural" :: "interpolate in vertex centred and conserve in cell centred directions, using the same order"
   "poly-cons3lfb" :: "interpolate polynomially in vertex centred directions and conserve with 3rd order accuracy and a linear fallback in cell centred directions"
-} "ddf"
+  "poly-eno3lfb" :: "interpolate polynomially in vertex centred directions and use ENO stencils with 3rd order accuracy and a linear fallback in cell centred directions"
+} "natural"
 
 CCTK_INT prolongation_order "Prolongation order"
 {
   0:* :: ""
 } 1
+
+BOOLEAN prolongate_per_group "Prolongate all variables in a group together"
+{
+} no
 
 CCTK_INT interpolation_order "Interpolation order" STEERABLE=always
 {
@@ -541,12 +581,17 @@ BOOLEAN out_norm_omit_unstable "Omit unstable norms (e.g. maxloc)" STEERABLE=alw
 {
 } no
 
+BOOLEAN out_norm_omit_sumloc_for_backward_compatibility "Omit sumloc norms" STEERABLE=always
+{
+} no
+
 
 
 KEYWORD openpmd_format "openPMD file format" STEERABLE=always
 {
   "HDF5" :: ""
-  "ADIOS1" :: ""
+  "ADIOS1" :: "requires openPMD_api <0.16"
+  "ADIOS2_auto" :: "Choose ADIOS2 format automatically (either ADIOS2_BP5 or ADIOS2_BP4)"
   "ADIOS2" :: "requires openPMD_api <0.15"
   "ADIOS2_BP" :: "requires openPMD_api >=0.15"
   "ADIOS2_BP4" :: "requires openPMD_api >=0.15"
@@ -554,7 +599,9 @@ KEYWORD openpmd_format "openPMD file format" STEERABLE=always
   "ADIOS2_SST" :: ""
   "ADIOS2_SSC" :: ""
   "JSON" :: ""
-} "ADIOS2_BP5"
+  "TOML" :: "requires openPMD_api >=0.16"
+  "GENERIC" :: "requires openPMD_api >=0.16"
+} "ADIOS2_auto"
 
 STRING out_openpmd_vars "Variables to output in openPMD format" STEERABLE=always
 {

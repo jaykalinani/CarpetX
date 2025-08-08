@@ -1,3 +1,4 @@
+#pragma GCC optimize("O0")
 #include "driver.hxx"
 
 #include "boundaries.hxx"
@@ -36,14 +37,13 @@
 #include <vector>
 
 namespace CarpetX {
-using namespace std;
 
 // Global variables
 
 int ghext_handle = -1;
 
 amrex::AMReX *restrict pamrex = nullptr;
-unique_ptr<GHExt> ghext;
+std::unique_ptr<GHExt> ghext;
 
 // Registered functions
 
@@ -116,12 +116,12 @@ std::ostream &operator<<(std::ostream &os, const boundary_t boundary) {
   return os;
 }
 
-array<array<symmetry_t, dim>, 2> get_symmetries(const int patch) {
+std::array<std::array<symmetry_t, dim>, 2> get_symmetries(const int patch) {
   // patch < 0 return symmetries without taking interpatch boundaries into
   // account
   DECLARE_CCTK_PARAMETERS;
 
-  array<array<bool, 3>, 2> is_interpatch{
+  std::array<std::array<bool, 3>, 2> is_interpatch{
       {{{false, false, false}}, {{false, false, false}}}};
   if (patch >= 0 &&
       CCTK_IsFunctionAliased("MultiPatch_GetBoundarySpecification2")) {
@@ -133,9 +133,11 @@ array<array<symmetry_t, dim>, 2> get_symmetries(const int patch) {
       for (int d = 0; d < dim; ++d)
         is_interpatch[f][d] = is_interpatch_boundary[2 * d + f];
   }
-  const array<array<bool, 3>, 2> is_periodic{{
-      {{bool(periodic_x), bool(periodic_y), bool(periodic_z)}},
-      {{bool(periodic_x), bool(periodic_y), bool(periodic_z)}},
+  const std::array<std::array<bool, 3>, 2> is_periodic{{
+      {{bool(periodic && periodic_x), bool(periodic && periodic_y),
+        bool(periodic && periodic_z)}},
+      {{bool(periodic && periodic_x), bool(periodic && periodic_y),
+        bool(periodic && periodic_z)}},
   }};
   const array<array<bool, 3>, 2> is_reflection{{
       {{bool(reflection_x), bool(reflection_y), bool(reflection_z)}},
@@ -148,7 +150,7 @@ array<array<symmetry_t, dim>, 2> get_symmetries(const int patch) {
       assert(is_interpatch[f][d] + is_periodic[f][d] + is_reflection[f][d] <=
              1);
 
-  array<array<symmetry_t, dim>, 2> symmetries;
+  std::array<std::array<symmetry_t, dim>, 2> symmetries;
   for (int f = 0; f < 2; ++f)
     for (int d = 0; d < dim; ++d)
       symmetries[f][d] = is_interpatch[f][d]   ? symmetry_t::interpatch
@@ -159,16 +161,17 @@ array<array<symmetry_t, dim>, 2> get_symmetries(const int patch) {
   return symmetries;
 }
 
-array<array<boundary_t, dim>, 2> get_default_boundaries() {
+std::array<std::array<boundary_t, dim>, 2> get_default_boundaries() {
   DECLARE_CCTK_PARAMETERS;
 
-  const array<array<symmetry_t, dim>, 2> symmetries = get_symmetries(-1);
-  array<array<bool, 3>, 2> is_symmetry;
+  const std::array<std::array<symmetry_t, dim>, 2> symmetries =
+      get_symmetries(-1);
+  std::array<std::array<bool, 3>, 2> is_symmetry;
   for (int f = 0; f < 2; ++f)
     for (int d = 0; d < dim; ++d)
       is_symmetry[f][d] = symmetries[f][d] != symmetry_t::none;
 
-  const array<array<bool, 3>, 2> is_dirichlet{{
+  const std::array<std::array<bool, 3>, 2> is_dirichlet{{
       {{
           bool(CCTK_EQUALS(boundary_x, "dirichlet")),
           bool(CCTK_EQUALS(boundary_y, "dirichlet")),
@@ -180,7 +183,7 @@ array<array<boundary_t, dim>, 2> get_default_boundaries() {
           bool(CCTK_EQUALS(boundary_upper_z, "dirichlet")),
       }},
   }};
-  const array<array<bool, 3>, 2> is_linear_extrapolation{{
+  const std::array<std::array<bool, 3>, 2> is_linear_extrapolation{{
       {{
           bool(CCTK_EQUALS(boundary_x, "linear extrapolation")),
           bool(CCTK_EQUALS(boundary_y, "linear extrapolation")),
@@ -192,7 +195,7 @@ array<array<boundary_t, dim>, 2> get_default_boundaries() {
           bool(CCTK_EQUALS(boundary_upper_z, "linear extrapolation")),
       }},
   }};
-  const array<array<bool, 3>, 2> is_neumann{{
+  const std::array<std::array<bool, 3>, 2> is_neumann{{
       {{
           bool(CCTK_EQUALS(boundary_x, "neumann")),
           bool(CCTK_EQUALS(boundary_y, "neumann")),
@@ -204,7 +207,7 @@ array<array<boundary_t, dim>, 2> get_default_boundaries() {
           bool(CCTK_EQUALS(boundary_upper_z, "neumann")),
       }},
   }};
-  const array<array<bool, 3>, 2> is_robin{{
+  const std::array<std::array<bool, 3>, 2> is_robin{{
       {{
           bool(CCTK_EQUALS(boundary_x, "robin")),
           bool(CCTK_EQUALS(boundary_y, "robin")),
@@ -223,7 +226,7 @@ array<array<boundary_t, dim>, 2> get_default_boundaries() {
                  is_robin[f][d] <=
              1);
 
-  array<array<boundary_t, dim>, 2> boundaries;
+  std::array<std::array<boundary_t, dim>, 2> boundaries;
   for (int f = 0; f < 2; ++f)
     for (int d = 0; d < dim; ++d)
       boundaries[f][d] = is_symmetry[f][d]    ? boundary_t::symmetry_boundary
@@ -237,16 +240,18 @@ array<array<boundary_t, dim>, 2> get_default_boundaries() {
   return boundaries;
 }
 
-array<array<boundary_t, dim>, 2> get_group_boundaries(const int gi) {
+std::array<std::array<boundary_t, dim>, 2> get_group_boundaries(const int gi) {
   DECLARE_CCTK_PARAMETERS;
 
-  const array<array<symmetry_t, dim>, 2> symmetries = get_symmetries(-1);
-  array<array<bool, 3>, 2> is_symmetry;
+  const std::array<std::array<symmetry_t, dim>, 2> symmetries =
+      get_symmetries(-1);
+  std::array<std::array<bool, 3>, 2> is_symmetry;
   for (int f = 0; f < 2; ++f)
     for (int d = 0; d < dim; ++d)
       is_symmetry[f][d] = symmetries[f][d] != symmetry_t::none;
 
-  array<array<boundary_t, dim>, 2> boundaries = get_default_boundaries();
+  std::array<std::array<boundary_t, dim>, 2> boundaries =
+      get_default_boundaries();
 
   const auto override_group_boundary = [&](const char *const var_set_string,
                                            const int dir, const int face,
@@ -254,8 +259,8 @@ array<array<boundary_t, dim>, 2> get_group_boundaries(const int gi) {
     // Arguments for the callback function
     struct arg_t {
       const int gi;
-      const array<array<bool, dim>, 2> &is_symmetry;
-      array<array<boundary_t, dim>, 2> &boundaries;
+      const std::array<std::array<bool, dim>, 2> &is_symmetry;
+      std::array<std::array<boundary_t, dim>, 2> &boundaries;
       const int dir, face;
       const boundary_t boundary;
     } arg{gi, is_symmetry, boundaries, dir, face, boundary};
@@ -316,7 +321,7 @@ bool get_group_checkpoint_flag(const int gi) {
   if (iret == UTIL_ERROR_TABLE_NO_SUCH_KEY) {
     return true;
   } else if (iret >= 0) {
-    string str(buf);
+    std::string str(buf);
     for (auto &c : str)
       c = tolower(c);
     if (str == "yes")
@@ -337,7 +342,7 @@ bool get_group_restrict_flag(const int gi) {
   if (iret == UTIL_ERROR_TABLE_NO_SUCH_KEY) {
     return true;
   } else if (iret >= 0) {
-    string str(buf);
+    std::string str(buf);
     for (auto &c : str)
       c = tolower(c);
     if (str == "yes")
@@ -350,14 +355,14 @@ bool get_group_restrict_flag(const int gi) {
   }
 }
 
-array<int, dim> get_group_indextype(const int gi) {
+std::array<int, dim> get_group_indextype(const int gi) {
   DECLARE_CCTK_PARAMETERS;
 
   assert(gi >= 0);
 
   const int tags = CCTK_GroupTagsTableI(gi);
   assert(tags >= 0);
-  array<CCTK_INT, dim> index;
+  std::array<CCTK_INT, dim> index;
 
   // The CST stage doesn't look for the `index` tag, and
   // `CCTK_ARGUMENTSX_...` would thus ignore it
@@ -389,11 +394,11 @@ array<int, dim> get_group_indextype(const int gi) {
   return indextype;
 }
 
-array<int, dim> get_group_fluxes(const int gi) {
+std::array<int, dim> get_group_fluxes(const int gi) {
   assert(gi >= 0);
   const int tags = CCTK_GroupTagsTableI(gi);
   assert(tags >= 0);
-  vector<char> fluxes_buf(1000);
+  std::vector<char> fluxes_buf(1000);
   const int iret =
       Util_TableGetString(tags, fluxes_buf.size(), fluxes_buf.data(), "fluxes");
   if (iret == UTIL_ERROR_TABLE_NO_SUCH_KEY) {
@@ -404,18 +409,18 @@ array<int, dim> get_group_fluxes(const int gi) {
     assert(0);
   }
 
-  const string str(fluxes_buf.data());
-  vector<string> strs;
-  size_t end = 0;
+  const std::string str(fluxes_buf.data());
+  std::vector<std::string> strs;
+  std::size_t end = 0;
   while (end < str.size()) {
-    const size_t begin = str.find_first_not_of(' ', end);
+    const std::size_t begin = str.find_first_not_of(' ', end);
     if (begin == string::npos)
       break;
     end = str.find(' ', begin);
     strs.push_back(str.substr(begin, end - begin));
   }
 
-  array<int, dim> fluxes;
+  std::array<int, dim> fluxes;
   fluxes.fill(-1);
   if (strs.empty())
     return fluxes; // No fluxes specified
@@ -438,12 +443,12 @@ array<int, dim> get_group_fluxes(const int gi) {
   return fluxes;
 }
 
-array<int, dim> get_group_nghostzones(const int gi) {
+std::array<int, dim> get_group_nghostzones(const int gi) {
   DECLARE_CCTK_PARAMETERS;
   assert(gi >= 0);
   const int tags = CCTK_GroupTagsTableI(gi);
   assert(tags >= 0);
-  array<CCTK_INT, dim> nghostzones;
+  std::array<CCTK_INT, dim> nghostzones;
   int iret =
       Util_TableGetIntArray(tags, dim, nghostzones.data(), "nghostzones");
   if (iret == UTIL_ERROR_TABLE_NO_SUCH_KEY) {
@@ -459,7 +464,7 @@ array<int, dim> get_group_nghostzones(const int gi) {
   return nghostzones;
 }
 
-vector<array<int, dim> > get_group_parities(const int gi) {
+std::vector<std::array<int, dim> > get_group_parities(const int gi) {
   DECLARE_CCTK_PARAMETERS;
   assert(gi >= 0);
   const int tags = CCTK_GroupTagsTableI(gi);
@@ -473,19 +478,19 @@ vector<array<int, dim> > get_group_parities(const int gi) {
   } else {
     assert(0);
   }
-  vector<CCTK_INT> parities1(nelems);
+  std::vector<CCTK_INT> parities1(nelems);
   const int iret =
       Util_TableGetIntArray(tags, nelems, parities1.data(), "parities");
   assert(iret == nelems);
   assert(nelems % dim == 0);
-  vector<array<int, dim> > parities(nelems / dim);
-  for (size_t n = 0; n < parities.size(); ++n)
+  std::vector<std::array<int, dim> > parities(nelems / dim);
+  for (std::size_t n = 0; n < parities.size(); ++n)
     for (int d = 0; d < dim; ++d)
       parities.at(n).at(d) = parities1.at(dim * n + d);
   return parities;
 }
 
-vector<CCTK_REAL> get_group_dirichlet_values(const int gi) {
+std::vector<CCTK_REAL> get_group_dirichlet_values(const int gi) {
   DECLARE_CCTK_PARAMETERS;
   assert(gi >= 0);
   const int tags = CCTK_GroupTagsTableI(gi);
@@ -500,14 +505,14 @@ vector<CCTK_REAL> get_group_dirichlet_values(const int gi) {
   } else {
     assert(0);
   }
-  vector<CCTK_REAL> dirichlet_values(nelems);
+  std::vector<CCTK_REAL> dirichlet_values(nelems);
   const int iret = Util_TableGetRealArray(tags, nelems, dirichlet_values.data(),
                                           "dirichlet_values");
   assert(iret == nelems);
   return dirichlet_values;
 }
 
-vector<CCTK_REAL> get_group_robin_values(const int gi) {
+std::vector<CCTK_REAL> get_group_robin_values(const int gi) {
   DECLARE_CCTK_PARAMETERS;
   assert(gi >= 0);
   const int tags = CCTK_GroupTagsTableI(gi);
@@ -521,14 +526,14 @@ vector<CCTK_REAL> get_group_robin_values(const int gi) {
   } else {
     assert(0);
   }
-  vector<CCTK_REAL> robin_values(nelems);
+  std::vector<CCTK_REAL> robin_values(nelems);
   const int iret =
       Util_TableGetRealArray(tags, nelems, robin_values.data(), "robin_values");
   assert(iret == nelems);
   return robin_values;
 }
 
-amrex::Interpolater *get_interpolator(const array<int, dim> indextype) {
+amrex::Interpolater *get_interpolator(const std::array<int, dim> indextype) {
   DECLARE_CCTK_PARAMETERS;
 
   enum class interp_t {
@@ -536,10 +541,12 @@ amrex::Interpolater *get_interpolator(const array<int, dim> indextype) {
     interpolate,
     conservative,
     ddf,
-    ddf_eno,
-    ddf_hermite,
+    eno,
+    minmod,
+    hermite,
     natural,
     poly_cons3lfb,
+    poly_eno3lfb,
   };
   static interp_t interp = [&]() {
     if (CCTK_EQUALS(prolongation_type, "interpolate"))
@@ -548,14 +555,18 @@ amrex::Interpolater *get_interpolator(const array<int, dim> indextype) {
       return interp_t::conservative;
     else if (CCTK_EQUALS(prolongation_type, "ddf"))
       return interp_t::ddf;
-    else if (CCTK_EQUALS(prolongation_type, "ddf-eno"))
-      return interp_t::ddf_eno;
-    else if (CCTK_EQUALS(prolongation_type, "ddf-hermite"))
-      return interp_t::ddf_hermite;
+    else if (CCTK_EQUALS(prolongation_type, "eno"))
+      return interp_t::eno;
+    else if (CCTK_EQUALS(prolongation_type, "minmod"))
+      return interp_t::minmod;
+    else if (CCTK_EQUALS(prolongation_type, "hermite"))
+      return interp_t::hermite;
     else if (CCTK_EQUALS(prolongation_type, "natural"))
       return interp_t::natural;
     else if (CCTK_EQUALS(prolongation_type, "poly-cons3lfb"))
       return interp_t::poly_cons3lfb;
+    else if (CCTK_EQUALS(prolongation_type, "poly-eno3lfb"))
+      return interp_t::poly_eno3lfb;
     else
       assert(0);
   }();
@@ -568,72 +579,104 @@ amrex::Interpolater *get_interpolator(const array<int, dim> indextype) {
     case 0b000:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c000_o1;
+        return &prolongate_poly_3d_rf2_c000_o1;
       case 3:
-        return &prolongate_3d_rf2_c000_o3;
+        return &prolongate_poly_3d_rf2_c000_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c000_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c000_o7;
       }
       break;
 
     case 0b001:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c001_o1;
+        return &prolongate_poly_3d_rf2_c001_o1;
       case 3:
-        return &prolongate_3d_rf2_c001_o3;
+        return &prolongate_poly_3d_rf2_c001_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c001_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c001_o7;
       }
       break;
 
     case 0b010:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c010_o1;
+        return &prolongate_poly_3d_rf2_c010_o1;
       case 3:
-        return &prolongate_3d_rf2_c010_o3;
+        return &prolongate_poly_3d_rf2_c010_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c010_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c010_o7;
       }
       break;
 
     case 0b011:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c011_o1;
+        return &prolongate_poly_3d_rf2_c011_o1;
       case 3:
-        return &prolongate_3d_rf2_c011_o3;
+        return &prolongate_poly_3d_rf2_c011_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c011_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c011_o7;
       }
       break;
 
     case 0b100:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c100_o1;
+        return &prolongate_poly_3d_rf2_c100_o1;
       case 3:
-        return &prolongate_3d_rf2_c100_o3;
+        return &prolongate_poly_3d_rf2_c100_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c100_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c100_o7;
       }
       break;
 
     case 0b101:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c101_o1;
+        return &prolongate_poly_3d_rf2_c101_o1;
       case 3:
-        return &prolongate_3d_rf2_c101_o3;
+        return &prolongate_poly_3d_rf2_c101_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c101_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c101_o7;
       }
       break;
 
     case 0b110:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c110_o1;
+        return &prolongate_poly_3d_rf2_c110_o1;
       case 3:
-        return &prolongate_3d_rf2_c110_o3;
+        return &prolongate_poly_3d_rf2_c110_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c110_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c110_o7;
       }
       break;
 
     case 0b111:
       switch (prolongation_order) {
       case 1:
-        return &prolongate_3d_rf2_c111_o1;
+        return &prolongate_poly_3d_rf2_c111_o1;
       case 3:
-        return &prolongate_3d_rf2_c111_o3;
+        return &prolongate_poly_3d_rf2_c111_o3;
+      case 5:
+        return &prolongate_poly_3d_rf2_c111_o5;
+      case 7:
+        return &prolongate_poly_3d_rf2_c111_o7;
       }
       break;
     }
@@ -807,139 +850,187 @@ amrex::Interpolater *get_interpolator(const array<int, dim> indextype) {
     }
     break;
 
-  case interp_t::ddf_eno:
+  case interp_t::eno:
 
     switch (prolongation_order) {
-
-    case 1:
-      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
-      case 0b000:
-        return &prolongate_ddf_eno_3d_rf2_c000_o1;
-      case 0b001:
-        return &prolongate_ddf_eno_3d_rf2_c001_o1;
-      case 0b010:
-        return &prolongate_ddf_eno_3d_rf2_c010_o1;
-      case 0b011:
-        return &prolongate_ddf_eno_3d_rf2_c011_o1;
-      case 0b100:
-        return &prolongate_ddf_eno_3d_rf2_c100_o1;
-      case 0b101:
-        return &prolongate_ddf_eno_3d_rf2_c101_o1;
-      case 0b110:
-        return &prolongate_ddf_eno_3d_rf2_c110_o1;
-      case 0b111:
-        return &prolongate_ddf_eno_3d_rf2_c111_o1;
-      }
-      break;
 
     case 3:
       switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
       case 0b000:
-        return &prolongate_ddf_eno_3d_rf2_c000_o3;
+        return &prolongate_eno_3d_rf2_c000_o3;
       case 0b001:
-        return &prolongate_ddf_eno_3d_rf2_c001_o3;
+        return &prolongate_eno_3d_rf2_c001_o3;
       case 0b010:
-        return &prolongate_ddf_eno_3d_rf2_c010_o3;
+        return &prolongate_eno_3d_rf2_c010_o3;
       case 0b011:
-        return &prolongate_ddf_eno_3d_rf2_c011_o3;
+        return &prolongate_eno_3d_rf2_c011_o3;
       case 0b100:
-        return &prolongate_ddf_eno_3d_rf2_c100_o3;
+        return &prolongate_eno_3d_rf2_c100_o3;
       case 0b101:
-        return &prolongate_ddf_eno_3d_rf2_c101_o3;
+        return &prolongate_eno_3d_rf2_c101_o3;
       case 0b110:
-        return &prolongate_ddf_eno_3d_rf2_c110_o3;
+        return &prolongate_eno_3d_rf2_c110_o3;
       case 0b111:
-        return &prolongate_ddf_eno_3d_rf2_c111_o3;
+        return &prolongate_eno_3d_rf2_c111_o3;
       }
       break;
 
     case 5:
       switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
       case 0b000:
-        return &prolongate_ddf_eno_3d_rf2_c000_o5;
+        return &prolongate_eno_3d_rf2_c000_o5;
       case 0b001:
-        return &prolongate_ddf_eno_3d_rf2_c001_o5;
+        return &prolongate_eno_3d_rf2_c001_o5;
       case 0b010:
-        return &prolongate_ddf_eno_3d_rf2_c010_o5;
+        return &prolongate_eno_3d_rf2_c010_o5;
       case 0b011:
-        return &prolongate_ddf_eno_3d_rf2_c011_o5;
+        return &prolongate_eno_3d_rf2_c011_o5;
       case 0b100:
-        return &prolongate_ddf_eno_3d_rf2_c100_o5;
+        return &prolongate_eno_3d_rf2_c100_o5;
       case 0b101:
-        return &prolongate_ddf_eno_3d_rf2_c101_o5;
+        return &prolongate_eno_3d_rf2_c101_o5;
       case 0b110:
-        return &prolongate_ddf_eno_3d_rf2_c110_o5;
+        return &prolongate_eno_3d_rf2_c110_o5;
       case 0b111:
-        return &prolongate_ddf_eno_3d_rf2_c111_o5;
+        return &prolongate_eno_3d_rf2_c111_o5;
       }
       break;
     }
     break;
 
-  case interp_t::ddf_hermite:
+  case interp_t::minmod:
 
     switch (prolongation_order) {
 
     case 1:
       switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
       case 0b000:
-        return &prolongate_ddfh_3d_rf2_c000_o1;
+        return &prolongate_minmod_3d_rf2_c000_o1;
       case 0b001:
-        return &prolongate_ddfh_3d_rf2_c001_o1;
+        return &prolongate_minmod_3d_rf2_c001_o1;
       case 0b010:
-        return &prolongate_ddfh_3d_rf2_c010_o1;
+        return &prolongate_minmod_3d_rf2_c010_o1;
       case 0b011:
-        return &prolongate_ddfh_3d_rf2_c011_o1;
+        return &prolongate_minmod_3d_rf2_c011_o1;
       case 0b100:
-        return &prolongate_ddfh_3d_rf2_c100_o1;
+        return &prolongate_minmod_3d_rf2_c100_o1;
       case 0b101:
-        return &prolongate_ddfh_3d_rf2_c101_o1;
+        return &prolongate_minmod_3d_rf2_c101_o1;
       case 0b110:
-        return &prolongate_ddfh_3d_rf2_c110_o1;
+        return &prolongate_minmod_3d_rf2_c110_o1;
       case 0b111:
-        return &prolongate_ddfh_3d_rf2_c111_o1;
+        return &prolongate_minmod_3d_rf2_c111_o1;
       }
       break;
 
     case 3:
       switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
       case 0b000:
-        return &prolongate_ddfh_3d_rf2_c000_o3;
+        return &prolongate_minmod_3d_rf2_c000_o3;
       case 0b001:
-        return &prolongate_ddfh_3d_rf2_c001_o3;
+        return &prolongate_minmod_3d_rf2_c001_o3;
       case 0b010:
-        return &prolongate_ddfh_3d_rf2_c010_o3;
+        return &prolongate_minmod_3d_rf2_c010_o3;
       case 0b011:
-        return &prolongate_ddfh_3d_rf2_c011_o3;
+        return &prolongate_minmod_3d_rf2_c011_o3;
       case 0b100:
-        return &prolongate_ddfh_3d_rf2_c100_o3;
+        return &prolongate_minmod_3d_rf2_c100_o3;
       case 0b101:
-        return &prolongate_ddfh_3d_rf2_c101_o3;
+        return &prolongate_minmod_3d_rf2_c101_o3;
       case 0b110:
-        return &prolongate_ddfh_3d_rf2_c110_o3;
+        return &prolongate_minmod_3d_rf2_c110_o3;
       case 0b111:
-        return &prolongate_ddfh_3d_rf2_c111_o3;
+        return &prolongate_minmod_3d_rf2_c111_o3;
       }
       break;
 
     case 5:
       switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
       case 0b000:
-        return &prolongate_ddfh_3d_rf2_c000_o5;
+        return &prolongate_minmod_3d_rf2_c000_o5;
       case 0b001:
-        return &prolongate_ddfh_3d_rf2_c001_o5;
+        return &prolongate_minmod_3d_rf2_c001_o5;
       case 0b010:
-        return &prolongate_ddfh_3d_rf2_c010_o5;
+        return &prolongate_minmod_3d_rf2_c010_o5;
       case 0b011:
-        return &prolongate_ddfh_3d_rf2_c011_o5;
+        return &prolongate_minmod_3d_rf2_c011_o5;
       case 0b100:
-        return &prolongate_ddfh_3d_rf2_c100_o5;
+        return &prolongate_minmod_3d_rf2_c100_o5;
       case 0b101:
-        return &prolongate_ddfh_3d_rf2_c101_o5;
+        return &prolongate_minmod_3d_rf2_c101_o5;
       case 0b110:
-        return &prolongate_ddfh_3d_rf2_c110_o5;
+        return &prolongate_minmod_3d_rf2_c110_o5;
       case 0b111:
-        return &prolongate_ddfh_3d_rf2_c111_o5;
+        return &prolongate_minmod_3d_rf2_c111_o5;
+      }
+      break;
+    }
+    break;
+
+  case interp_t::hermite:
+
+    switch (prolongation_order) {
+
+    case 1:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_hermite_3d_rf2_c000_o1;
+      case 0b001:
+        return &prolongate_hermite_3d_rf2_c001_o1;
+      case 0b010:
+        return &prolongate_hermite_3d_rf2_c010_o1;
+      case 0b011:
+        return &prolongate_hermite_3d_rf2_c011_o1;
+      case 0b100:
+        return &prolongate_hermite_3d_rf2_c100_o1;
+      case 0b101:
+        return &prolongate_hermite_3d_rf2_c101_o1;
+      case 0b110:
+        return &prolongate_hermite_3d_rf2_c110_o1;
+      case 0b111:
+        return &prolongate_hermite_3d_rf2_c111_o1;
+      }
+      break;
+
+    case 3:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_hermite_3d_rf2_c000_o3;
+      case 0b001:
+        return &prolongate_hermite_3d_rf2_c001_o3;
+      case 0b010:
+        return &prolongate_hermite_3d_rf2_c010_o3;
+      case 0b011:
+        return &prolongate_hermite_3d_rf2_c011_o3;
+      case 0b100:
+        return &prolongate_hermite_3d_rf2_c100_o3;
+      case 0b101:
+        return &prolongate_hermite_3d_rf2_c101_o3;
+      case 0b110:
+        return &prolongate_hermite_3d_rf2_c110_o3;
+      case 0b111:
+        return &prolongate_hermite_3d_rf2_c111_o3;
+      }
+      break;
+
+    case 5:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_hermite_3d_rf2_c000_o5;
+      case 0b001:
+        return &prolongate_hermite_3d_rf2_c001_o5;
+      case 0b010:
+        return &prolongate_hermite_3d_rf2_c010_o5;
+      case 0b011:
+        return &prolongate_hermite_3d_rf2_c011_o5;
+      case 0b100:
+        return &prolongate_hermite_3d_rf2_c100_o5;
+      case 0b101:
+        return &prolongate_hermite_3d_rf2_c101_o5;
+      case 0b110:
+        return &prolongate_hermite_3d_rf2_c110_o5;
+      case 0b111:
+        return &prolongate_hermite_3d_rf2_c111_o5;
       }
       break;
     }
@@ -1127,6 +1218,98 @@ amrex::Interpolater *get_interpolator(const array<int, dim> indextype) {
     }
     break;
 
+  case interp_t::poly_eno3lfb:
+
+    switch (prolongation_order) {
+
+    case 1:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_poly_eno3lfb_3d_rf2_c000_o1;
+      case 0b001:
+        return &prolongate_poly_eno3lfb_3d_rf2_c001_o1;
+      case 0b010:
+        return &prolongate_poly_eno3lfb_3d_rf2_c010_o1;
+      case 0b011:
+        return &prolongate_poly_eno3lfb_3d_rf2_c011_o1;
+      case 0b100:
+        return &prolongate_poly_eno3lfb_3d_rf2_c100_o1;
+      case 0b101:
+        return &prolongate_poly_eno3lfb_3d_rf2_c101_o1;
+      case 0b110:
+        return &prolongate_poly_eno3lfb_3d_rf2_c110_o1;
+      case 0b111:
+        return &prolongate_poly_eno3lfb_3d_rf2_c111_o1;
+      }
+      break;
+
+    case 3:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_poly_eno3lfb_3d_rf2_c000_o3;
+      case 0b001:
+        return &prolongate_poly_eno3lfb_3d_rf2_c001_o3;
+      case 0b010:
+        return &prolongate_poly_eno3lfb_3d_rf2_c010_o3;
+      case 0b011:
+        return &prolongate_poly_eno3lfb_3d_rf2_c011_o3;
+      case 0b100:
+        return &prolongate_poly_eno3lfb_3d_rf2_c100_o3;
+      case 0b101:
+        return &prolongate_poly_eno3lfb_3d_rf2_c101_o3;
+      case 0b110:
+        return &prolongate_poly_eno3lfb_3d_rf2_c110_o3;
+      case 0b111:
+        return &prolongate_poly_eno3lfb_3d_rf2_c111_o3;
+      }
+      break;
+
+    case 5:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_poly_eno3lfb_3d_rf2_c000_o5;
+      case 0b001:
+        return &prolongate_poly_eno3lfb_3d_rf2_c001_o5;
+      case 0b010:
+        return &prolongate_poly_eno3lfb_3d_rf2_c010_o5;
+      case 0b011:
+        return &prolongate_poly_eno3lfb_3d_rf2_c011_o5;
+      case 0b100:
+        return &prolongate_poly_eno3lfb_3d_rf2_c100_o5;
+      case 0b101:
+        return &prolongate_poly_eno3lfb_3d_rf2_c101_o5;
+      case 0b110:
+        return &prolongate_poly_eno3lfb_3d_rf2_c110_o5;
+      case 0b111:
+        return &prolongate_poly_eno3lfb_3d_rf2_c111_o5;
+      }
+      break;
+
+#if 0
+    case 7:
+      switch ((indextype[0] << 2) | (indextype[1] << 1) | (indextype[2] << 0)) {
+      case 0b000:
+        return &prolongate_poly_eno3lfb_3d_rf2_c000_o7;
+      case 0b001:
+        return &prolongate_poly_eno3lfb_3d_rf2_c001_o7;
+      case 0b010:
+        return &prolongate_poly_eno3lfb_3d_rf2_c010_o7;
+      case 0b011:
+        return &prolongate_poly_eno3lfb_3d_rf2_c011_o7;
+      case 0b100:
+        return &prolongate_poly_eno3lfb_3d_rf2_c100_o7;
+      case 0b101:
+        return &prolongate_poly_eno3lfb_3d_rf2_c101_o7;
+      case 0b110:
+        return &prolongate_poly_eno3lfb_3d_rf2_c110_o7;
+      case 0b111:
+        return &prolongate_poly_eno3lfb_3d_rf2_c111_o7;
+      }
+      break;
+#endif
+    }
+    break;
+
   case interp_t::unset:
     // do nothing; errors are handled below
     break;
@@ -1172,11 +1355,11 @@ GHExt::PatchData::PatchData(const int patch) : patch(patch) {
   // Number of coarse grid cells
   amrex::Vector<int> ncells{ncells_x, ncells_y, ncells_z};
 
-  if (CCTK_IsFunctionAliased("MultiPatch_GetPatchSpecification")) {
+  if (CCTK_IsFunctionAliased("MultiPatch_GetPatchSpecification2")) {
     CCTK_INT ncells1[dim];
     CCTK_REAL xmin1[dim], xmax1[dim];
-    const int ierr =
-        MultiPatch_GetPatchSpecification(patch, dim, ncells1, xmin1, xmax1);
+    const int ierr = MultiPatch_GetPatchSpecification2(patch, nullptr, dim,
+                                                       ncells1, xmin1, xmax1);
     assert(!ierr);
     for (int d = 0; d < dim; ++d)
       ncells[d] = ncells1[d];
@@ -1287,7 +1470,7 @@ GHExt::PatchData::LevelData::LevelData(const int patch, const int level,
       for (int d = 0; d < dim; ++d) {
         assert(groupdata.fluxes[d] != groupdata.groupindex);
         const auto &flux_groupdata = *this->groupdata.at(groupdata.fluxes[d]);
-        array<int, dim> flux_indextype{1, 1, 1};
+        std::array<int, dim> flux_indextype{1, 1, 1};
         flux_indextype[d] = 0;
         assert(flux_groupdata.indextype == flux_indextype);
         assert(flux_groupdata.numvars == groupdata.numvars);
@@ -1354,7 +1537,7 @@ GHExt::PatchData::LevelData::GroupData::GroupData(
   boundaries = get_group_boundaries(gi);
   parities = get_group_parities(gi);
   if (parities.empty()) {
-    array<int, dim> parity;
+    std::array<int, dim> parity;
     for (int d = 0; d < dim; ++d)
       // parity[d] = indextype[d] == 0 ? +1 : -1;
       parity[d] = +1;
@@ -1373,10 +1556,10 @@ GHExt::PatchData::LevelData::GroupData::GroupData(
     robin_values.resize(numvars, 0);
 
   amrex::BCRec bcrec;
-  for (int d = 0; d < dim; ++d) {
-    for (int f = 0; f < dim; ++f) {
+  for (int f = 0; f < 2; ++f) {
+    for (int d = 0; d < dim; ++d) {
       const auto bc =
-          ghext->patchdata.at(patch).symmetries[d][f] == symmetry_t::periodic
+          ghext->patchdata.at(patch).symmetries[f][d] == symmetry_t::periodic
               ? amrex::BCType::int_dir
               : amrex::BCType::ext_dir;
       if (f == 0)
@@ -1474,16 +1657,16 @@ void GHExt::PatchData::LevelData::GroupData::apply_boundary_conditions(
     if (geom.isPeriodic(d))
       gdomain.grow(d, mfab.nGrow(d));
 
-  // This loop is parallel
-  loop_over_components(mfab, [&](const int index, const int component) {
-    amrex::FArrayBox &dest = mfab[index];
-
-    // If there are cells not in the valid + periodic grown box,
-    // then we need to fill them here
+  // Do not tile because the boundary boxes are likely already small
+  const auto mfitinfo = amrex::MFItInfo().DisableDeviceSync();
+#pragma omp parallel
+  for (amrex::MFIter mfi(mfab, mfitinfo); mfi.isValid(); ++mfi) {
+    amrex::FArrayBox &dest = mfab[mfi];
+    // If there are cells not in the valid + periodic grown box, then
+    // we need to fill them here
     if (!gdomain.contains(dest.box()))
       BoundaryCondition(*this, dest).apply();
-  });
-  // synchronize();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1527,7 +1710,7 @@ void CactusAmrCore::ErrorEst(const int level, amrex::TagBoxArray &tags,
 #pragma omp critical
     CCTK_VINFO("ErrorEst patch %d level %d", patch, level);
 
-  const int gi = CCTK_GroupIndex("CarpetX::regrid_error");
+  const int gi = CCTK_GroupIndex("CarpetXRegrid::regrid_error");
   assert(gi >= 0);
   const int vi = 0;
   const int tl = 0;
@@ -1601,7 +1784,6 @@ void SetupGlobals() {
     if (group.grouptype == CCTK_GF)
       continue;
     assert(group.grouptype == CCTK_ARRAY || group.grouptype == CCTK_SCALAR);
-    assert(group.vartype == CCTK_VARIABLE_REAL);
     assert(group.disttype == CCTK_DISTRIB_CONSTANT);
     assert(group.dim >= 0);
     assert(group.dim <= dim);
@@ -1652,9 +1834,8 @@ void SetupGlobals() {
     arraygroupdata.data.resize(group.numtimelevels);
     arraygroupdata.valid.resize(group.numtimelevels);
     for (int tl = 0; tl < int(arraygroupdata.data.size()); ++tl) {
-      // TODO: Allocate in managed memory
-      arraygroupdata.data.at(tl).resize(arraygroupdata.numvars *
-                                        arraygroupdata.array_size);
+      arraygroupdata.data.at(tl).alloc(
+          group.vartype, arraygroupdata.numvars * arraygroupdata.array_size);
       why_valid_t why([]() { return "SetupGlobals"; });
       arraygroupdata.valid.at(tl).resize(arraygroupdata.numvars, why);
       for (int vi = 0; vi < arraygroupdata.numvars; ++vi) {
@@ -1666,12 +1847,11 @@ void SetupGlobals() {
         valid.valid_ghosts = true;
         arraygroupdata.valid.at(tl).at(vi).set_all(
             valid, []() { return "SetupGlobals"; });
-
-        // TODO: make poison_invalid and check_invalid virtual members of
-        // CommonGroupData
-        poison_invalid(arraygroupdata, vi, tl);
-        check_valid(arraygroupdata, vi, tl, nan_handling,
-                    []() { return "SetupGlobals"; });
+        // TODO: make poison_invalid and check_invalid virtual members
+        // of CommonGroupData
+        poison_invalid_ga(gi, vi, tl);
+        check_valid_ga(gi, vi, tl, nan_handling,
+                       []() { return "SetupGlobals"; });
       }
     }
   }
@@ -1679,7 +1859,7 @@ void SetupGlobals() {
 
 void CactusAmrCore::SetupLevel(const int level, const amrex::BoxArray &ba,
                                const amrex::DistributionMapping &dm,
-                               const function<string()> &why) {
+                               const std::function<std::string()> &why) {
   DECLARE_CCTK_PARAMETERS;
 
   if (verbose)
@@ -1693,6 +1873,7 @@ void CactusAmrCore::SetupLevel(const int level, const amrex::BoxArray &ba,
   if (level >= int(level_modified.size()))
     level_modified.resize(level + 1, true);
   level_modified.at(level) = true;
+  const active_levels_t active_levels(level, level + 1, patch, patch + 1);
 
   // Initialize data
   const auto &leveldata = patchdata.leveldata.at(level);
@@ -1706,12 +1887,10 @@ void CactusAmrCore::SetupLevel(const int level, const amrex::BoxArray &ba,
     if (group.grouptype != CCTK_GF)
       continue;
 
-    const GHExt::PatchData::LevelData::GroupData &groupdata =
-        *leveldata.groupdata.at(gi);
-
+    const auto &restrict groupdata = *leveldata.groupdata.at(gi);
     for (int tl = 0; tl < int(groupdata.mfab.size()); ++tl)
       for (int vi = 0; vi < groupdata.numvars; ++vi)
-        poison_invalid(leveldata, groupdata, vi, tl);
+        poison_invalid_gf(active_levels, gi, vi, tl);
   }
 
   if (verbose)
@@ -1754,6 +1933,10 @@ void CactusAmrCore::MakeNewLevelFromCoarse(
   auto &patchdata = ghext->patchdata.at(patch);
   auto &leveldata = patchdata.leveldata.at(level);
   auto &coarseleveldata = patchdata.leveldata.at(level - 1);
+  const active_levels_t active_levels(level, level + 1, patch, patch + 1);
+  const active_levels_t active_coarse_levels(level - 1, level, patch,
+                                             patch + 1);
+
   const int num_groups = CCTK_NumGroups();
   for (int gi = 0; gi < num_groups; ++gi) {
     cGroup group;
@@ -1794,14 +1977,14 @@ void CactusAmrCore::MakeNewLevelFromCoarse(
           error_if_invalid(coarsegroupdata, vi, tl, make_valid_all(), []() {
             return "MakeNewLevelFromCoarse before prolongation";
           });
-          check_valid(
-              coarseleveldata, coarsegroupdata, vi, tl, nan_handling,
-              []() { return "MakeNewLevelFromCoarse before prolongation"; });
+          check_valid_gf(active_coarse_levels, gi, vi, tl, nan_handling, []() {
+            return "MakeNewLevelFromCoarse before prolongation";
+          });
         }
         FillPatch_NewLevel(
-            groupdata, *groupdata.mfab.at(tl), *coarsegroupdata.mfab.at(tl),
-            patchdata.amrcore->Geom(level - 1), patchdata.amrcore->Geom(level),
-            interpolator, groupdata.bcrecs);
+            groupdata, coarsegroupdata, *groupdata.mfab.at(tl),
+            *coarsegroupdata.mfab.at(tl), patchdata.amrcore->Geom(level - 1),
+            patchdata.amrcore->Geom(level), interpolator, groupdata.bcrecs);
         const auto outer_valid =
             groupdata.all_faces_have_symmetries_or_boundaries()
                 ? make_valid_outer()
@@ -1812,18 +1995,17 @@ void CactusAmrCore::MakeNewLevelFromCoarse(
               []() { return "MakeNewLevelFromCoarse after prolongation"; });
           // This cannot be called because it would access the data
           // with old metadata
-          // check_valid(leveldata, groupdata, vi, tl, nan_handling, []() {
+          // check_valid_gf(active_levels, gi, vi, tl, nan_handling, []() {
           //   return "MakeNewLevelFromCoarse after prolongation";
           // });
         }
       }
 
-      for (int vi = 0; vi < groupdata.numvars; ++vi) {
-        // Already poisoned by SetupLevel
-        check_valid(leveldata, groupdata, vi, tl, nan_handling, []() {
+      // Already poisoned by SetupLevel
+      for (int vi = 0; vi < groupdata.numvars; ++vi)
+        check_valid_gf(active_levels, gi, vi, tl, nan_handling, []() {
           return "MakeNewLevelFromCoarse after prolongation";
         });
-      }
     } // for tl
 
   } // for gi
@@ -1846,6 +2028,9 @@ void CactusAmrCore::RemakeLevel(const int level, const amrex::Real time,
   auto &leveldata = patchdata.leveldata.at(level);
   assert(leveldata.level > 0);
   auto &coarseleveldata = patchdata.leveldata.at(level - 1);
+  const active_levels_t active_levels(level, level + 1, patch, patch + 1);
+  const active_levels_t active_coarse_levels(level - 1, level, patch,
+                                             patch + 1);
 
   // Copy or prolongate
   assert(!use_subcycling_wip);
@@ -1874,21 +2059,20 @@ void CactusAmrCore::RemakeLevel(const int level, const amrex::Real time,
                                             : nan_handling_t::allow_nans;
 
     for (int tl = 0; tl < ntls; ++tl) {
-      for (int vi = 0; vi < groupdata.numvars; ++vi)
-        poison_invalid(leveldata, groupdata, vi, tl);
+      for (int vi = 0; vi < groupdata.numvars; ++vi) {
+        poison_invalid_gf(active_levels, gi, vi, tl);
 
-      if (tl < prolongate_tl) {
-        for (int vi = 0; vi < groupdata.numvars; ++vi) {
+        if (tl < prolongate_tl) {
           error_if_invalid(coarsegroupdata, vi, tl, make_valid_all(),
                            []() { return "RemakeLevel before prolongation"; });
           error_if_invalid(groupdata, vi, tl, make_valid_all(),
                            []() { return "RemakeLevel before prolongation"; });
-          check_valid(coarseleveldata, coarsegroupdata, vi, tl, nan_handling,
-                      []() { return "RemakeLevel before prolongation"; });
-          check_valid(leveldata, groupdata, vi, tl, nan_handling,
-                      []() { return "RemakeLevel before prolongation"; });
         }
-      }
+        check_valid_gf(active_coarse_levels, gi, vi, tl, nan_handling,
+                       []() { return "RemakeLevel before prolongation"; });
+        check_valid_gf(active_levels, gi, vi, tl, nan_handling,
+                       []() { return "RemakeLevel before prolongation"; });
+      } // for vi
     } // for tl
 
   } // for gi
@@ -1945,9 +2129,10 @@ void CactusAmrCore::RemakeLevel(const int level, const amrex::Real time,
       if (tl < prolongate_tl) {
         // Copy from same level and/or prolongate from next coarser level
         FillPatch_RemakeLevel(
-            groupdata, *groupdata.mfab.at(tl), *coarsegroupdata.mfab.at(tl),
-            *oldgroupdata.mfab.at(tl), patchdata.amrcore->Geom(level - 1),
-            patchdata.amrcore->Geom(level), interpolator, groupdata.bcrecs);
+            groupdata, coarsegroupdata, *groupdata.mfab.at(tl),
+            *coarsegroupdata.mfab.at(tl), *oldgroupdata.mfab.at(tl),
+            patchdata.amrcore->Geom(level - 1), patchdata.amrcore->Geom(level),
+            interpolator, groupdata.bcrecs);
 
         for (int vi = 0; vi < groupdata.numvars; ++vi)
           groupdata.valid.at(tl).at(vi) =
@@ -1956,11 +2141,10 @@ void CactusAmrCore::RemakeLevel(const int level, const amrex::Real time,
       }
 
       for (int vi = 0; vi < groupdata.numvars; ++vi) {
-        poison_invalid(leveldata, groupdata, vi, tl);
-        check_valid(leveldata, groupdata, vi, tl, nan_handling,
-                    []() { return "RemakeLevel after prolongation"; });
+        poison_invalid_gf(active_levels, gi, vi, tl);
+        check_valid_gf(active_levels, gi, vi, tl, nan_handling,
+                       []() { return "RemakeLevel after prolongation"; });
       }
-
     } // for tl
 
   } // for gi
@@ -1991,16 +2175,18 @@ void CactusAmrCore::ClearLevel(const int level) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename T, size_t N> inline vector<T> seq(const array<T, N> &v) {
-  vector<T> r;
+template <typename T, size_t N>
+inline std::vector<T> seq(const std::array<T, N> &v) {
+  std::vector<T> r;
   for (const auto &x : v)
     r.push_back(x);
   return r;
 }
 
 template <typename T, size_t N>
-inline vector<vector<T> > seqs(const vector<array<T, N> > &v) {
-  vector<vector<T> > r;
+inline std::vector<std::vector<T> >
+seqs(const std::vector<std::array<T, N> > &v) {
+  std::vector<std::vector<T> > r;
   for (const auto &x : v)
     r.push_back(seq(x));
   return r;
@@ -2010,7 +2196,7 @@ inline vector<vector<T> > seqs(const vector<array<T, N> > &v) {
 
 namespace std {
 template <typename T, size_t N>
-YAML::Emitter &operator<<(YAML::Emitter &yaml, const array<T, N> &arr) {
+YAML::Emitter &operator<<(YAML::Emitter &yaml, const std::array<T, N> &arr) {
   yaml << YAML::Flow << YAML::BeginSeq;
   for (const auto &elt : arr)
     yaml << elt;
@@ -2104,6 +2290,28 @@ YAML::Emitter &operator<<(YAML::Emitter &yaml, const amrex::AmrCore &amrcore) {
 } // namespace amrex
 namespace CarpetX {
 
+std::ostream &
+operator<<(std::ostream &os,
+           const GHExt::GlobalData::AnyTypeVector::AnyTypeScalarRef &scalar) {
+  const char sep = '\t';
+  switch (scalar._vect.type()) {
+  case CCTK_VARIABLE_REAL:
+    os << *(CCTK_REAL *)scalar._vect.data_at(scalar._idx);
+    break;
+  case CCTK_VARIABLE_INT:
+    os << *(CCTK_INT *)scalar._vect.data_at(scalar._idx);
+    break;
+  case CCTK_VARIABLE_COMPLEX: {
+    CCTK_COMPLEX value = *(CCTK_COMPLEX *)scalar._vect.data_at(scalar._idx);
+    os << value.real() << sep << value.imag();
+  } break;
+  default:
+    assert(0 && "Unexpected variable type");
+    break;
+  }
+  return os;
+}
+
 YAML::Emitter &operator<<(YAML::Emitter &yaml,
                           const GHExt::CommonGroupData &commongroupdata) {
   yaml << YAML::LocalTag("commongroupdata-1.0.0");
@@ -2122,6 +2330,47 @@ YAML::Emitter &operator<<(YAML::Emitter &yaml,
        << commongroupdata.do_restrict;
   yaml << YAML::Key << "valid" << YAML::Value << commongroupdata.valid;
   yaml << YAML::EndMap;
+  return yaml;
+}
+
+YAML::Emitter &operator<<(YAML::Emitter &yaml, const CCTK_COMPLEX &cval) {
+  yaml << YAML::Flow << YAML::BeginSeq << cval.real() << cval.imag()
+       << YAML::EndSeq;
+  return yaml;
+};
+
+YAML::Emitter &
+operator<<(YAML::Emitter &yaml,
+           const GHExt::GlobalData::AnyTypeVector::AnyTypeScalarRef
+               &anytypescalarref) {
+  switch (anytypescalarref._vect.type()) {
+  case CCTK_VARIABLE_COMPLEX:
+    yaml << *(const CCTK_COMPLEX *)anytypescalarref._vect.data_at(
+        anytypescalarref._idx);
+    break;
+  case CCTK_VARIABLE_REAL:
+    yaml << *(const CCTK_REAL *)anytypescalarref._vect.data_at(
+        anytypescalarref._idx);
+    break;
+  case CCTK_VARIABLE_INT:
+    yaml << *(const CCTK_INT *)anytypescalarref._vect.data_at(
+        anytypescalarref._idx);
+    break;
+  default:
+    // missed to implement a type
+    CCTK_VERROR("Cannot handle type %d", anytypescalarref._vect.type());
+    break;
+  }
+  return yaml;
+}
+
+YAML::Emitter &
+operator<<(YAML::Emitter &yaml,
+           const GHExt::GlobalData::AnyTypeVector &anytypevector) {
+  yaml << YAML::BeginSeq;
+  for (size_t i = 0; i < anytypevector.size(); ++i)
+    yaml << anytypevector[i];
+  yaml << YAML::EndSeq;
   return yaml;
 }
 
@@ -2214,7 +2463,7 @@ YAML::Emitter &operator<<(YAML::Emitter &yaml, const GHExt &ghext) {
   return yaml;
 }
 
-ostream &operator<<(ostream &os, const GHExt &ghext) {
+std::ostream &operator<<(std::ostream &os, const GHExt &ghext) {
   YAML::Emitter yaml;
   yaml << ghext;
   os << yaml.c_str() << "\n";
@@ -2254,7 +2503,7 @@ extern "C" int CarpetX_Startup() {
       "optimized",
 #endif
   };
-  ostringstream buf;
+  std::ostringstream buf;
   buf << logo();
   buf << "AMR driver provided by CarpetX,\n"
       << "using AMReX " << amrex::Version() << " (";
@@ -2299,6 +2548,11 @@ extern "C" int CarpetX_Startup() {
   CCTK_OverloadInterpGridArrays(CarpetX_InterpGridArrays);
   CCTK_OverloadArrayGroupSizeB(ArrayGroupSizeB);
   CCTK_OverloadGroupDynamicData(GroupDynamicData);
+
+  iret = CCTK_InterpRegisterOpLocalUniform(InterpLocalUniform, "CarpetX",
+                                           CCTK_THORNSTRING);
+  assert(!iret && "CCTK_InterpRegisterOpLocalUniform failed");
+
   return 0;
 }
 
@@ -2324,12 +2578,40 @@ void *SetupGH(tFleshConfig *fc, int convLevel, cGH *restrict cctkGH) {
   // we get core files.
   pp.add("amrex.throw_exception", 1);
 
+  // Enable managed memory (i.e. copy data automatically between
+  // accelerator and host)
+#ifndef AMREX_USE_HIP
+  // This option would render the code inefficient on AMD GPUs.
+  // However, it is required to enable some thorns (TOVSolverX,
+  // TwoPuncturesX, ...) to work on NVIDIA GPUs.
+  // We might need to update those thorns to git rid of this option
+  // completely at some point.
+  pp.add("amrex.the_arena_is_managed", 1);
+#endif
+
   // Set blocking factors via parameter table since AmrMesh needs to
   // know them when its constructor is running, but there are no
   // constructor arguments for them
-  pp.add("amr.max_grid_size_x", max_grid_size_x);
-  pp.add("amr.max_grid_size_y", max_grid_size_y);
-  pp.add("amr.max_grid_size_z", max_grid_size_z);
+  amrex::Vector<int> max_grid_size_x_vec(20, -1), max_grid_size_y_vec(20, -1),
+      max_grid_size_z_vec(20, -1);
+  for (int level = 0; level < 20; ++level) {
+    int size_x = max_grid_sizes_x[level];
+    int size_y = max_grid_sizes_y[level];
+    int size_z = max_grid_sizes_z[level];
+    if (size_x == -1)
+      size_x = max_grid_size_x;
+    if (size_y == -1)
+      size_y = max_grid_size_y;
+    if (size_z == -1)
+      size_z = max_grid_size_z;
+    max_grid_size_x_vec.at(level) = size_x;
+    max_grid_size_y_vec.at(level) = size_y;
+    max_grid_size_z_vec.at(level) = size_z;
+  }
+  pp.addarr("amr.max_grid_size_x", max_grid_size_x_vec);
+  pp.addarr("amr.max_grid_size_y", max_grid_size_y_vec);
+  pp.addarr("amr.max_grid_size_z", max_grid_size_z_vec);
+
   pp.add("amr.refine_grid_layout", refine_grid_layout);
   pp.add("amr.blocking_factor_x", blocking_factor_x);
   pp.add("amr.blocking_factor_y", blocking_factor_y);
@@ -2543,16 +2825,16 @@ CCTK_INT CarpetX_GetBoundarySizesAndTypes(
   const cGH *restrict const cctkGH = static_cast<const cGH *>(cctkGH_);
   assert(size == 2 * dim);
 
-  const array<array<bool, 3>, 2> is_periodic{{
+  const std::array<std::array<bool, 3>, 2> is_periodic{{
       {{bool(periodic_x), bool(periodic_y), bool(periodic_z)}},
       {{bool(periodic_x), bool(periodic_y), bool(periodic_z)}},
   }};
-  const array<array<bool, 3>, 2> is_reflection{{
+  const std::array<std::array<bool, 3>, 2> is_reflection{{
       {{bool(reflection_x), bool(reflection_y), bool(reflection_z)}},
       {{bool(reflection_upper_x), bool(reflection_upper_y),
         bool(reflection_upper_z)}},
   }};
-  const array<array<bool, 3>, 2> is_boundary{{
+  const std::array<std::array<bool, 3>, 2> is_boundary{{
       {{
           bool(!CCTK_EQUALS(boundary_x, "none")),
           bool(!CCTK_EQUALS(boundary_y, "none")),

@@ -1007,6 +1007,14 @@ struct GF3D2layout {
 #endif
     return i * di + j * dj + k * dk - off;
   }
+  CCTK_DEVICE CCTK_HOST
+  inline int linear(int i, int j, int k, int c) const
+  {
+#ifdef CCTK_DEBUG
+    assert(c >= 0 && "component index must be non-negative");
+#endif
+    return linear(i, j, k) + c * np;
+  }
   CCTK_DEVICE CCTK_HOST int linear(const vect<int, dim> &I) const {
     return linear(I[0], I[1], I[2]);
   }

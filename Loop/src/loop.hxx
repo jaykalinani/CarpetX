@@ -188,9 +188,8 @@ public:
             const vect<int, dim> BI =
                 vect<int, dim>(I == bnd_max - 1) - vect<int, dim>(I == bnd_min);
             const vect<bool, dim> CI1{CI, CJ, CK};
-            const PointDesc p =
-                point_desc(CI1, I, iter, NI, I0, BI, bnd_min, bnd_max,
-                           loop_min, loop_max);
+            const PointDesc p = point_desc(CI1, I, iter, NI, I0, BI, bnd_min,
+                                           bnd_max, loop_min, loop_max);
             f(p);
           }
         }
@@ -1006,6 +1005,12 @@ struct GF3D2layout {
     assert(k >= imin[2] && k < imax[2]);
 #endif
     return i * di + j * dj + k * dk - off;
+  }
+  CCTK_DEVICE CCTK_HOST inline int linear(int i, int j, int k, int c) const {
+#ifdef CCTK_DEBUG
+    assert(c >= 0 && "component index must be non-negative");
+#endif
+    return linear(i, j, k) + c * np;
   }
   CCTK_DEVICE CCTK_HOST int linear(const vect<int, dim> &I) const {
     return linear(I[0], I[1], I[2]);

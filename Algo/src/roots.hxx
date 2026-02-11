@@ -205,28 +205,170 @@ T schroder(F f, T guess, T min, T max, int min_bits, int max_iters,
 template <typename F, typename T, int N>
 inline CCTK_ATTRIBUTE_ALWAYS_INLINE ALGO_HOST ALGO_DEVICE Arith::vec<T, N>
 newton_raphson_nd(F f, const Arith::vec<T, N> &guess,
-                  const Arith::vec<T, N> &min, const Arith::vec<T, N> &max,
-                  int min_bits, int max_iters, int &iters, bool &failed) {
+                  const Arith::vec<T, N> &xmin, const Arith::vec<T, N> &xmax,
+                  int min_bits, int max_iters, int &iters, bool &failed,
+                  T epsabs = T(0), T epsrel = T(0)) {
   using vec = Arith::vec<T, N>;
   using mat = Arith::mat<T, N>;
   failed = false;
-  // auto tolfx = boost::math::tools::eps_tolerance<T>(min_bits);
-  const auto tolfx = eps_tolerance<T>(min_bits);
-  vec x = guess;
+
+  auto isfinite_vec = [&](const vec &x) CCTK_ATTRIBUTE_ALWAYS_INLINE {
+    for (int i = 0; i < N; ++i)
+      if (!std::isfinite(x(i)))
+        return false;
+    return true;
+  };
+
+  // Residual threshold:
+  // - If caller supplies epsabs, use it.
+  // - Otherwise derive from min_bits, but never weaker than 1e-9 because
+  //   Algo::Test_roots asserts sumabs(gn(x)) < 1e-9.
+  const T epsabs_eff =
+      (epsabs > T(0)) ? epsabs : std::min(ldexp1(T(1), -min_bits), T(1.0e-9));
+
+  auto step_converged = [&](const vec &dx, const vec &x)
+      CCTK_ATTRIBUTE_ALWAYS_INLINE {
+    // Enable delta test only when BOTH epsabs and epsrel are provided.
+    if (!(epsabs > T(0) && epsrel > T(0)))
+      return false;
+    using std::abs;
+    for (int i = 0; i < N; ++i) {
+      const T tol = epsabs + epsrel * abs(x(i));
+      if (!(abs(dx(i)) <= tol))
+        return false;
+    }
+    return true;
+  };
+
+  // ---------------------------
+  // Mode A: legacy plain Newton
+  // (unit tests + old call sites)
+  // ---------------------------
+  if (!(epsabs > T(0) || epsrel > T(0))) {
+    vec x = guess;
+
+    for (iters = 1; iters <= max_iters; ++iters) {
+      const auto [fx0, jac0] = f(x);
+      const vec fx = fx0;
+      const mat jac = jac0;
+
+      const T errfx = sumabs(fx);
+      if (!std::isfinite(errfx)) {
+        failed = true;
+        return x;
+      }
+      if (errfx <= epsabs_eff)
+        return x;
+
+      const T det_jac = calc_det(jac);
+      if (!std::isfinite(det_jac) || det_jac == T(0)) {
+        failed = true;
+        return x;
+      }
+      const mat inv_jac = calc_inv(jac, det_jac);
+
+      const vec dx([&](int i) {
+        return -Arith::sum<N>([&](int j) { return inv_jac(i, j) * fx(j); });
+      });
+
+      if (!isfinite_vec(dx)) {
+        failed = true;
+        return x;
+      }
+
+      x = x + dx;
+      if (!isfinite_vec(x)) {
+        failed = true;
+        return x;
+      }
+    }
+
+    failed = true;
+    return x;
+  }
+
+  // ---------------------------------
+  // Mode B: bounded/damped Newton
+  // (nuX implicit solves, stiff cases)
+  // ---------------------------------
+  auto clamp = [&](const vec &x) CCTK_ATTRIBUTE_ALWAYS_INLINE {
+    return vec([&](int i) {
+      return std::max(xmin(i), std::min(xmax(i), x(i)));
+    });
+  };
+
+  vec x = clamp(guess);
+
   for (iters = 1; iters <= max_iters; ++iters) {
     const auto [fx0, jac0] = f(x);
     const vec fx = fx0;
     const mat jac = jac0;
+
     const T errfx = sumabs(fx);
-    if (tolfx(1 + errfx, 1))
+    if (!std::isfinite(errfx)) {
+      failed = true;
       return x;
+    }
+    if (errfx <= epsabs_eff)
+      return x;
+
     const T det_jac = calc_det(jac);
+    if (!std::isfinite(det_jac) || det_jac == T(0)) {
+      failed = true;
+      return x;
+    }
     const mat inv_jac = calc_inv(jac, det_jac);
-    const vec dx([&](int i) {
-      return -Arith::sum<2>([&](int j) { return inv_jac(i, j) * fx(j); });
+
+    const vec dx0([&](int i) {
+      return -Arith::sum<N>([&](int j) { return inv_jac(i, j) * fx(j); });
     });
-    x += dx;
+
+    if (!isfinite_vec(dx0)) {
+      failed = true;
+      return x;
+    }
+
+    // Backtracking line search (bounded)
+    T lambda = T(1);
+    vec x_best = x;
+    T err_best = errfx;
+    bool accepted = false;
+
+    for (int ls = 0; ls < 12; ++ls) {
+      const vec x_try = clamp(x + lambda * dx0);
+      const auto [f_try0, jac_try0] = f(x_try);
+      (void)jac_try0;
+      const vec f_try = f_try0;
+      const T err_try = sumabs(f_try);
+
+      const T improve =
+          std::numeric_limits<T>::epsilon() * std::max(T(1), err_best);
+      if (std::isfinite(err_try) && err_try <= err_best - improve) {
+        x_best = x_try;
+        err_best = err_try;
+        accepted = true;
+        break;
+      }
+      lambda *= T(0.5);
+    }
+
+    if (!accepted) {
+      failed = true;
+      return x;
+    }
+
+    const vec dx = x_best - x;
+    x = x_best;
+
+    if (!isfinite_vec(x)) {
+      failed = true;
+      return x;
+    }
+
+    if (step_converged(dx, x))
+      return x;
   }
+
   failed = true;
   return x;
 }

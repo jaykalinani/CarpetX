@@ -145,6 +145,14 @@ if(use_subcycling) {
   {
   } "Evaluate RHS for of state vector everywhere on the grid"
 
+  SCHEDULE GROUP ODESolvers_ImplicitRHS
+  {
+  } "Evaluate the known implicit RHS contribution everywhere on the grid"
+
+  SCHEDULE GROUP ODESolvers_ImplicitStep
+  {
+  } "Take an implicit step everywhere on the grid"
+
   SCHEDULE GROUP ODESolvers_EstimateError
   {
   } "Estimate discretization error (for regridding)"
@@ -209,11 +217,6 @@ if(use_subcycling) {
   # {
   # } "Evaluate the RHS for of state vector everywhere on the grid"
   
-  # # This group will also be scheduled dynamically from ODESolvers_solve
-  # SCHEDULE GROUP ODESolvers_ImplicitStep AT poststep AFTER ODESolvers_PostStep
-  # {
-  # } "Take an implicit step everywhere on the grid"
-
   # TODO: this does not yet handle "IMEX122" correctly
   # this group never actually executes since do_subseteps == 0 always, it is
   # only present to show up in the schedule printout
@@ -225,7 +228,15 @@ if(use_subcycling) {
   {
   } "Evaluate the RHS for of state vector everywhere on the grid"
 
-  SCHEDULE GROUP ODESolvers_PostStep IN ODESolvers_CalledBySolve AFTER ODESolvers_RHS
+  SCHEDULE GROUP ODESolvers_ImplicitRHS IN ODESolvers_CalledBySolve AFTER ODESolvers_RHS
+  {
+  } "Evaluate the known implicit RHS contribution everywhere on the grid"
+
+  SCHEDULE GROUP ODESolvers_ImplicitStep IN ODESolvers_CalledBySolve AFTER ODESolvers_ImplicitRHS
+  {
+  } "Take an implicit step everywhere on the grid"
+
+  SCHEDULE GROUP ODESolvers_PostStep IN ODESolvers_CalledBySolve AFTER ODESolvers_ImplicitStep
   {
   } "Apply boundary conditions to state vector, and project if necessary"
 

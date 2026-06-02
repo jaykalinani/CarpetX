@@ -3,6 +3,12 @@
 namespace ODESolvers {
 using namespace std;
 
+CCTK_REAL current_step_delta_time = 0.0;
+
+extern "C" CCTK_REAL ODESolvers_ProvideStepDeltaTime() {
+  return current_step_delta_time;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // Initialize the temporary mfab mechanism
@@ -161,6 +167,12 @@ statecomp_t statecomp_t::copy(const valid_t where) const {
   //   }
   // #endif
   return result;
+}
+
+void statecomp_t::set_zero(const valid_t where) const {
+  for (auto mfab : mfabs)
+    mfab->setVal(CCTK_REAL(0));
+  set_valid(where);
 }
 
 template <size_t N>

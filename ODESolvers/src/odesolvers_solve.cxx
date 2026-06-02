@@ -11,7 +11,9 @@ extern "C" void ODESolvers_InitConstants(CCTK_ARGUMENTS) {
 
   // Publish the active RK stage count for the subcycling band machinery
   // (read by CarpetX::build_bands and the recovery path).
-  CarpetX::ghext->num_rk_stages = CCTK_EQUALS(method, "SSPRK3") ? 3 : 4;
+  CarpetX::ghext->num_rk_stages =
+      (CCTK_EQUALS(method, "SSPRK3") || CCTK_EQUALS(method, "IMEX32L")) ? 3
+                                                                        : 4;
 }
 
 extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
@@ -27,6 +29,7 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
   Interval interval(timer);
 
   const CCTK_REAL dt = cctk_delta_time;
+  current_step_delta_time = dt;
   const int tl = 0;
 
   static Timer timer_setup("ODESolvers::Solve::setup");
@@ -124,6 +127,29 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
     rhs.check_valid(make_valid_int(),
                     "ODESolvers after calling ODESolvers_RHS");
   };
+  const auto calcimplicitrhs = [&](const int n) {
+    Interval interval_rhs(timer_rhs);
+    rhs.set_zero(make_valid_int());
+    if (verbose)
+      CCTK_VINFO("Calculating implicit RHS #%d at t=%g", n,
+                 double(cctkGH->cctk_time));
+    CallScheduleGroup(cctkGH, "ODESolvers_ImplicitRHS");
+    rhs.check_valid(make_valid_int(),
+                    "ODESolvers after calling ODESolvers_ImplicitRHS");
+  };
+  const auto calcimplicitstep = [&](const int n, const CCTK_REAL step_dt) {
+    if (step_dt == 0)
+      return;
+    if (verbose)
+      CCTK_VINFO("Taking implicit step #%d at t=%g with dt=%g", n,
+                 double(cctkGH->cctk_time), double(step_dt));
+    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = step_dt;
+    CallScheduleGroup(cctkGH, "ODESolvers_ImplicitStep");
+    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = dt;
+    var.check_valid(make_valid_int(),
+                    "ODESolvers after calling ODESolvers_ImplicitStep");
+    mark_invalid(dep_groups);
+  };
   // t = t_0 + c
   // var = a_0 * var + \Sum_i a_i * var_i
   const auto calcupdate = [&](const int n, const CCTK_REAL c,
@@ -145,6 +171,100 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
                    double(cctkGH->cctk_time));
     }
   };
+
+  const auto run_imex =
+      [&](const vector<CCTK_REAL> &cs, const vector<vector<CCTK_REAL> > &a_exp,
+          const vector<vector<CCTK_REAL> > &a_imp,
+          const vector<CCTK_REAL> &b_exp, const vector<CCTK_REAL> &b_imp) {
+        const int nstages = cs.size();
+        assert(int(a_exp.size()) == nstages);
+        assert(int(a_imp.size()) == nstages);
+        assert(int(b_exp.size()) == nstages);
+        assert(int(b_imp.size()) == nstages);
+
+        const auto old = copy_state(var, make_valid_all());
+        vector<statecomp_t> fks;
+        vector<statecomp_t> gks;
+        fks.reserve(nstages);
+        gks.reserve(nstages);
+
+        const auto define_stage_base = [&](const int stage) {
+          vector<CCTK_REAL> factors;
+          vector<const statecomp_t *> srcs;
+          factors.reserve(1 + 2 * stage);
+          srcs.reserve(1 + 2 * stage);
+          factors.push_back(1.0);
+          srcs.push_back(&old);
+          for (int j = 0; j < stage; ++j) {
+            if (a_exp.at(stage).at(j) != 0) {
+              factors.push_back(dt * a_exp.at(stage).at(j));
+              srcs.push_back(&fks.at(j));
+            }
+            if (a_imp.at(stage).at(j) != 0) {
+              factors.push_back(dt * a_imp.at(stage).at(j));
+              srcs.push_back(&gks.at(j));
+            }
+          }
+          statecomp_t::lincomb(var, 0.0, factors, srcs, make_valid_int());
+          var.check_valid(make_valid_int(),
+                          "ODESolvers after defining IMEX stage base");
+          mark_invalid(dep_groups);
+          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
+              old_time + cs.at(stage) * dt;
+          CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+        };
+
+        for (int stage = 0; stage < nstages; ++stage) {
+          if (stage == 0) {
+            *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time;
+          } else {
+            define_stage_base(stage);
+          }
+
+          const CCTK_REAL diag = a_imp.at(stage).at(stage);
+          if (diag == 0) {
+            calcimplicitrhs(stage + 1);
+            gks.push_back(copy_state(rhs, make_valid_int()));
+          } else {
+            const auto base = copy_state(var, make_valid_int());
+            calcimplicitstep(stage + 1, diag * dt);
+            CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+
+            auto g = copy_state(var, make_valid_int());
+            statecomp_t::lincomb(
+                g, 0.0,
+                vector<CCTK_REAL>{1.0 / (diag * dt), -1.0 / (diag * dt)},
+                vector<const statecomp_t *>{&var, &base}, make_valid_int());
+            gks.push_back(std::move(g));
+          }
+
+          calcrhs(stage + 1);
+          fks.push_back(copy_state(rhs, make_valid_int()));
+        }
+
+        vector<CCTK_REAL> factors;
+        vector<const statecomp_t *> srcs;
+        factors.reserve(1 + 2 * nstages);
+        srcs.reserve(1 + 2 * nstages);
+        factors.push_back(1.0);
+        srcs.push_back(&old);
+        for (int stage = 0; stage < nstages; ++stage) {
+          if (b_exp.at(stage) != 0) {
+            factors.push_back(dt * b_exp.at(stage));
+            srcs.push_back(&fks.at(stage));
+          }
+          if (b_imp.at(stage) != 0) {
+            factors.push_back(dt * b_imp.at(stage));
+            srcs.push_back(&gks.at(stage));
+          }
+        }
+        statecomp_t::lincomb(var, 0.0, factors, srcs, make_valid_int());
+        var.check_valid(make_valid_int(),
+                        "ODESolvers after defining IMEX final state");
+        mark_invalid(dep_groups);
+        *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt;
+        CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+      };
 
   *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time;
 
@@ -482,6 +602,43 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
       }
     }
     calcupdate(nsteps, dt, 0.0, factors, srcs);
+
+  } else if (CCTK_EQUALS(method, "IMEX42L")) {
+
+    const vector<CCTK_REAL> c{0, CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 1};
+    const vector<vector<CCTK_REAL> > a_exp{
+        {0, 0, 0, 0},
+        {CCTK_REAL(1) / 2, 0, 0, 0},
+        {0, CCTK_REAL(1) / 2, 0, 0},
+        {0, 0, 1, 0},
+    };
+    const vector<vector<CCTK_REAL> > a_imp{
+        {0, 0, 0, 0},
+        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0, 0},
+        {0, CCTK_REAL(1) / 6, CCTK_REAL(1) / 3, 0},
+        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 3, CCTK_REAL(1) / 3,
+         CCTK_REAL(1) / 6},
+    };
+    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 3,
+                             CCTK_REAL(1) / 3, CCTK_REAL(1) / 6};
+    run_imex(c, a_exp, a_imp, b, b);
+
+  } else if (CCTK_EQUALS(method, "IMEX32L")) {
+
+    const vector<CCTK_REAL> c{0, 1, CCTK_REAL(1) / 2};
+    const vector<vector<CCTK_REAL> > a_exp{
+        {0, 0, 0},
+        {1, 0, 0},
+        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0},
+    };
+    const vector<vector<CCTK_REAL> > a_imp{
+        {0, 0, 0},
+        {CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 0},
+        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 6, CCTK_REAL(2) / 3},
+    };
+    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 6,
+                             CCTK_REAL(2) / 3};
+    run_imex(c, a_exp, a_imp, b, b);
 
   } else if (CCTK_EQUALS(method, "IMEX122") ||
              CCTK_EQUALS(method, "Implicit Euler")) {

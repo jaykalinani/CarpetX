@@ -12,6 +12,8 @@ KEYWORD method "ODE solver method" STEERABLE=always
   "RKF78" :: "Runge-Kutta-Fehlberg 7(8)"
   "DP87" :: "Dormand & Prince 8(7)"
 
+  "IMEX42L" :: "RK4-explicit / L-stable DIRK implicit IMEX(4,4,2)"
+  "IMEX32L" :: "SSPRK3-explicit / L-stable DIRK implicit IMEX(3,3,2)"
   "IMEX122" :: "IMEX midpoint (1,2,2)"
   "Implicit Euler" :: "IMEX midpoint (1,2,2), misnamed"
 } "RK2"

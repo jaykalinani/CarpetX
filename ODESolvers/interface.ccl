@@ -12,6 +12,9 @@ void FUNCTION CallScheduleGroup(
   CCTK_STRING IN groupname)
 REQUIRES FUNCTION CallScheduleGroup
 
+CCTK_REAL FUNCTION ODESolvers_GetStepDeltaTime()
+PROVIDES FUNCTION ODESolvers_GetStepDeltaTime WITH ODESolvers_ProvideStepDeltaTime LANGUAGE C
+
 # these are *always* 0 (false) so that the groups do not execute
 # TODO: this does not handle "IMEX122" yet
 CCTK_INT do_substeps TYPE=SCALAR TAGS='checkpoint="no"' "Dummy condition used to generate schedule printouts"

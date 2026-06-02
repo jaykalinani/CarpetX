@@ -40,6 +40,7 @@ static inline int omp_get_max_threads() { return 1; }
 namespace ODESolvers {
 using namespace std;
 
+extern CCTK_REAL current_step_delta_time;
 ////////////////////////////////////////////////////////////////////////////////
 
 // Taken from <https://en.cppreference.com/w/cpp/experimental/make_array>
@@ -105,6 +106,7 @@ struct statecomp_t {
   }
 
   statecomp_t copy(const valid_t where) const;
+  void set_zero(const valid_t where) const;
 
   template <size_t N>
   static void lincomb(const statecomp_t &dst, CCTK_REAL scale,

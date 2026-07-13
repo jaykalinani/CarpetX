@@ -1,11 +1,17 @@
 # Claude sandbox template for CarpetX development with Docker Sandboxes (sbx).
 #
-# Layers the Einstein Toolkit dependency stack on top of the default claude
-# sandbox image, preserving the /usr (apt) vs /usr/local (source-built) split
-# that the option list (ubuntu-arm64.cfg) reads back.  The dependency layer is
-# a port of docker/carpetx-arm64v8-cpu.dockerfile (Ubuntu noble) to the base
-# image's Ubuntu (26.04 "resolute", GCC 15, CMake 4), trimmed to what the
-# sandbox build needs:
+# Layers on top of the default claude sandbox image:
+#   - the Einstein Toolkit dependency stack, preserving the /usr (apt) vs
+#     /usr/local (source-built) split that the option list (ubuntu-arm64.cfg)
+#     reads back
+#   - a pristine Cactus checkout at /home/agent/cactus/Cactus whose
+#     arrangements/CarpetX points at the mounted CarpetX workspace
+#   - Compile-ETK, option list, and thornlist (ENV CACTUSX/ETKCFG/ETKTHORNLIST)
+#     so agent_scripts/build.sh and test.sh work unchanged
+#
+# The dependency layer is a port of docker/carpetx-arm64v8-cpu.dockerfile
+# (Ubuntu noble) to the base image's Ubuntu (26.04 "resolute", GCC 15,
+# CMake 4), trimmed to what the sandbox build needs:
 #   - dropped source builds: HPCToolkit, ASDF (asdf-cxx), RePrimAnd, Conduit,
 #     SimulationIO (not referenced by the sandbox option list or thornlist)
 #   - dropped apt packages: libpetsc-real-dev (PDESolvers/PETSc are commented
@@ -309,7 +315,47 @@ RUN mkdir src && \
 RUN echo /usr/local/lib64 >/etc/ld.so.conf.d/usr-local-lib64.conf && \
     ldconfig
 
-# Return to the base image's runtime state (user/workdir; the entrypoint and
-# cmd are inherited unchanged) so sbx provisioning keeps working.
+# --- Cactus layer ---
+
+# Build driver used by agent_scripts/build.sh
+COPY Compile-ETK /usr/local/bin/Compile-ETK
+RUN chmod 755 /usr/local/bin/Compile-ETK
+
+# Thornlist referenced by ETKTHORNLIST below (the option list is copied
+# after the checkout so that cfg tweaks do not re-trigger GetComponents)
+COPY --chown=agent:agent carpetx.th /home/agent/etk/
+
+# Return to the base image's user (the entrypoint and cmd are inherited
+# unchanged) so sbx provisioning keeps working.
 USER agent
+
+# Formaline commits the source tree to a git repository during the Cactus
+# build and needs a git identity
+RUN git config --global user.name "Liwei Ji" && \
+    git config --global user.email "jiliwei.phys@gmail.com"
+
+# Pristine Cactus tree (no configs/, so the baked tree cannot go stale
+# relative to the option list): flesh + support thorns via GetComponents;
+# arrangements/CarpetX is replaced by a symlink to the CarpetX workspace,
+# which resolves at run time because sbx mounts workspaces at their host
+# paths (setup.sh re-links it if the workspace lives elsewhere).  The first
+# in-sandbox build configures from scratch; the named sandbox persists
+# configs/, exe/, and TEST/ across stop/start.
+ARG CARPETX_WORKSPACE=/Users/liwei/docker-workspace/repos/CarpetX
+RUN mkdir -p /home/agent/cactus && \
+    cd /home/agent/cactus && \
+    curl -fsSLO https://raw.githubusercontent.com/gridaphobe/CRL/master/GetComponents && \
+    chmod +x GetComponents && \
+    ./GetComponents --no-parallel --shallow /home/agent/etk/carpetx.th && \
+    rm -rf Cactus/arrangements/CarpetX && \
+    ln -s "$CARPETX_WORKSPACE" Cactus/arrangements/CarpetX
+
+# Option list referenced by ETKCFG below
+COPY --chown=agent:agent ubuntu-arm64.cfg /home/agent/etk/
+
+# The sandbox interface for agent_scripts/build.sh and test.sh
+ENV CACTUSX=/home/agent/cactus/Cactus \
+    ETKCFG=/home/agent/etk/ubuntu-arm64.cfg \
+    ETKTHORNLIST=/home/agent/etk/carpetx.th
+
 WORKDIR /home/agent/workspace

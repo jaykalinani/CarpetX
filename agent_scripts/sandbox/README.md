@@ -1,0 +1,60 @@
+# CarpetX sandbox template for Docker Sandboxes (sbx)
+
+This directory contains the complete, committed recipe for a Claude sandbox template in which `agent_scripts/build.sh` and `agent_scripts/test.sh` work exactly like on the host. The image is reproducible from this repository alone.
+
+## Contents
+
+| File | Purpose |
+| --- | --- |
+| `template.dockerfile` | Sandbox template image: default claude sandbox base + ETK dependency stack + pristine Cactus tree |
+| `ubuntu-arm64.cfg` | Cactus option list for the image (arm64 port of `scripts/actions-cpu-real64.cfg`) |
+| `carpetx.th` | Component/thorn list (copy of `~/Tools/ETK-Compile-Guides/ThornList/carpetx.th` — keep in sync) |
+| `Compile-ETK` | Vendored copy of `~/bin/Compile-ETK` (uses `make`, auto-creates a missing config, passes `THORNLIST=` at configure) |
+| `setup.sh` | One-time in-sandbox setup: links this repo into the Cactus tree, builds AMReX from the mounted source |
+
+## Building the image
+
+One dockerfile, starting from the maintained claude sandbox base image (`docker/sandbox-templates:claude-code-docker`), so the sbx provisioning (agent user, Claude Code, docker-in-sandbox, persistent-env plumbing) stays current with sbx releases:
+
+```bash
+cd <CarpetX>/agent_scripts/sandbox
+docker build -f template.dockerfile -t lwji/carpetx:sbx2 .
+```
+
+The from-scratch image build compiles ~8 libraries from source (timing: TODO, fill in during validation). Rebuilds after edits to this directory are fast (the dependency layers are cached).
+
+sbx has its own image store: it pulls `-t` images from a registry, **not** from the local docker daemon. To use a locally built template without pushing to Docker Hub:
+
+```bash
+docker save lwji/carpetx:sbx2 -o /tmp/carpetx-sbx2.tar
+sbx template load /tmp/carpetx-sbx2.tar
+```
+
+## Running
+
+```bash
+cd ~/docker-workspace/repos/CarpetX
+sbx run -t lwji/carpetx:sbx2 --name carpetx claude . ../amrex:ro
+```
+
+Inside the sandbox, once per sandbox (idempotent):
+
+```bash
+agent_scripts/sandbox/setup.sh   # link repo into Cactus tree, build AMReX from ../amrex (~7 min in plain docker)
+```
+
+then the usual
+
+```bash
+./agent_scripts/build.sh   # first build configures and compiles from scratch (~15 min in plain docker; in-sbx timing TODO); later builds are incremental
+./agent_scripts/test.sh    # full testsuite (~30 s in plain docker)
+```
+
+Named sandboxes persist across `sbx stop`/restart, so `configs/`, `exe/`, `TEST/`, and the AMReX install are cached across sessions and only the first build is slow. Remove with `sbx rm <name>` to start clean.
+
+## How it works
+
+- sbx mounts workspaces at their **host paths** (`/Users/liwei/docker-workspace/repos/CarpetX` appears at the same path inside the microVM), and the agent runs as the non-root `agent` user (uid 1000, passwordless sudo) provided by the base image.
+- The image adds the ETK dependency stack on top of the base, preserving the `/usr` (apt) vs `/usr/local` (source-built) split that `ubuntu-arm64.cfg` reads back — a port of `docker/carpetx-arm64v8-cpu.dockerfile` trimmed to what the sandbox build needs (see the header of `template.dockerfile` for what was dropped).
+- The image bakes a pristine GetComponents `--shallow` Cactus checkout at `/home/agent/cactus/Cactus` (no `configs/`, so the baked tree cannot go stale relative to the option list) with `arrangements/CarpetX` symlinked to the mounted workspace, and sets `CACTUSX`, `ETKCFG`, `ETKTHORNLIST` in the environment; `build.sh` uses those instead of the host's `ETKGUIDE`.
+- `setup.sh` builds AMReX out-of-source from the read-only `../amrex` mount into `/home/agent/cactus/amrex-lib` (which `ubuntu-arm64.cfg` points `AMREX_DIR` at). Without an amrex mount it falls back to the AMReX release baked into the image at `/usr/local` via a symlink.

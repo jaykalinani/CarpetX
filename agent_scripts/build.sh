@@ -5,8 +5,12 @@ if [ -z "${CACTUSX:-}" ]; then
   exit 1
 fi
 
-if [ -z "${ETKGUIDE:-}" ]; then
-  echo "✗ missing required env var: ETKGUIDE" >&2
+# Accept either the host interface (ETKGUIDE) or the sandbox interface
+# (ETKCFG + ETKTHORNLIST); explicit ETKCFG/ETKTHORNLIST take precedence.
+cfg="${ETKCFG:-${ETKGUIDE:+$ETKGUIDE/macos.cfg}}"
+thornlist="${ETKTHORNLIST:-${ETKGUIDE:+$ETKGUIDE/../ThornList/carpetx.th}}"
+if [ -z "$cfg" ] || [ -z "$thornlist" ]; then
+  echo "✗ missing required env vars: set ETKGUIDE or ETKCFG+ETKTHORNLIST" >&2
   exit 1
 fi
 
@@ -14,8 +18,8 @@ log="$CACTUSX/last-build.log"
 if (
   cd "$CACTUSX" &&
   Compile-ETK -e carpetx -j8 \
-    -c "$ETKGUIDE/macos.cfg" \
-    -t "$ETKGUIDE/../ThornList/carpetx.th"
+    -c "$cfg" \
+    -t "$thornlist"
 ) > "$log" 2>&1; then
   echo "✓ build"
 else

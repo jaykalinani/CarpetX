@@ -1,23 +1,18 @@
 #!/bin/bash
 
-if [ -z "${CONTAINERLOCAL:-}" ]; then
-  echo "✗ missing required env var: CONTAINERLOCAL" >&2
-  exit 1
-fi
-
-if [ -z "${CONTAINERLOCALCACTUS:-}" ]; then
-  echo "✗ missing required env var: CONTAINERLOCALCACTUS" >&2
+if [ -z "${CACTUSX:-}" ]; then
+  echo "✗ missing required env var: CACTUSX" >&2
   exit 1
 fi
 
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
-if docker exec \
-  -e CONTAINERLOCALCACTUS="$CONTAINERLOCALCACTUS" \
-  "$CONTAINERLOCAL" zsh -c '
-  cd "$CONTAINERLOCALCACTUS" &&
-  make sim-carpetx-testsuite
-' > "$log" 2>&1; then
+# PROMPT=no makes RunTest.pl take the default answer for every prompt,
+# so the testsuite runs non-interactively regardless of TTY
+if (
+  cd "$CACTUSX" &&
+  make carpetx-testsuite PROMPT=no
+) > "$log" 2>&1; then
   if grep -q 'Number failed            -> 0' "$log"; then
     echo "✓ test"
   else

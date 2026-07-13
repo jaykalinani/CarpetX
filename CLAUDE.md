@@ -15,6 +15,8 @@ Do **not** read reference test data files (e.g. `*/test/*/*.tsv`, `*/test/*/*.h5
 ./agent_scripts/test.sh
 ```
 
+An incremental build takes ~30 s and the testsuite ~1 min, but a from-clean build takes ~5 min — give `build.sh` a 10-minute timeout.
+
 To access test logs and build artifacts, read `./agent_docs/accessing-logs-and-artifacts.md`. To generate reference output for a new test, read `./agent_docs/generating-reference-output.md`.
 
 ## Commit & Pull Request Guidelines

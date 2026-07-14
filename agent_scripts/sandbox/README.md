@@ -21,9 +21,9 @@ cd <CarpetX>/agent_scripts/sandbox
 docker build -f template.dockerfile -t lwji/carpetx:sbx2 .
 ```
 
-The from-scratch image build compiles ~8 libraries from source (timing: TODO, fill in during validation). Rebuilds after edits to this directory are fast (the dependency layers are cached).
+The from-scratch image build compiles ~8 libraries from source (~10 min on an Apple-silicon host: dependency layer ~8 min, Cactus checkout ~1 min). Rebuilds after edits to this directory are fast (the dependency layers are cached).
 
-sbx has its own image store: it pulls `-t` images from a registry, **not** from the local docker daemon. To use a locally built template without pushing to Docker Hub:
+sbx has its own image store: it pulls `-t` images from a registry, **not** from the local docker daemon. To use a locally built template without pushing to Docker Hub (`docker save` ~10 s for the 1.7 GB tar, `sbx template load` ~5 s):
 
 ```bash
 docker save lwji/carpetx:sbx2 -o /tmp/carpetx-sbx2.tar
@@ -40,17 +40,28 @@ sbx run -t lwji/carpetx:sbx2 --name carpetx claude . ../amrex:ro
 Inside the sandbox, once per sandbox (idempotent):
 
 ```bash
-agent_scripts/sandbox/setup.sh   # link repo into Cactus tree, build AMReX from ../amrex (~7 min in plain docker)
+agent_scripts/sandbox/setup.sh   # link repo into Cactus tree, build AMReX from ../amrex (~30 s)
 ```
 
 then the usual
 
 ```bash
-./agent_scripts/build.sh   # first build configures and compiles from scratch (~15 min in plain docker; in-sbx timing TODO); later builds are incremental
-./agent_scripts/test.sh    # full testsuite (~30 s in plain docker)
+./agent_scripts/build.sh   # first build configures and compiles from scratch (~13 min); later builds are incremental (~10 s)
+./agent_scripts/test.sh    # full testsuite (~25 s; 94 tests across 22 thorns)
 ```
 
+Timings measured end to end in an sbx sandbox on an Apple-silicon host (18 vCPUs); the microVM gets all host CPUs by default, so it is roughly as fast as the host itself.
+
 Named sandboxes persist across `sbx stop`/restart, so `configs/`, `exe/`, `TEST/`, and the AMReX install are cached across sessions and only the first build is slow. Remove with `sbx rm <name>` to start clean.
+
+For non-interactive use (no attached agent), `sbx create` + `sbx exec` mirror the above:
+
+```bash
+sbx create -t lwji/carpetx:sbx2 --name carpetx claude . ../amrex:ro
+sbx exec -w "$PWD" carpetx agent_scripts/sandbox/setup.sh
+sbx exec -w "$PWD" carpetx ./agent_scripts/build.sh
+sbx exec -w "$PWD" carpetx ./agent_scripts/test.sh
+```
 
 ## How it works
 

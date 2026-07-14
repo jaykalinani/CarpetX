@@ -24,7 +24,7 @@ To access test logs and build artifacts, read `./agent_docs/accessing-logs-and-a
 The same two scripts work unchanged inside a Docker Sandboxes (sbx) microVM created from the committed template (recipe and full instructions: `agent_scripts/sandbox/README.md`):
 
 ```bash
-sbx run -t lwji/carpetx:sbx2 --name carpetx claude . ../amrex:ro   # on the host, from the repo root
+sbx run -t lwji/carpetx:sbx --name carpetx claude . ../amrex:ro   # on the host, from the repo root
 agent_scripts/sandbox/setup.sh                                     # in-sandbox, once per sandbox (~30 s)
 ```
 

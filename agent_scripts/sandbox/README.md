@@ -18,7 +18,7 @@ One dockerfile, starting from the maintained claude sandbox base image (`docker/
 
 ```bash
 cd <CarpetX>/agent_scripts/sandbox
-docker build -f template.dockerfile -t lwji/carpetx:sbx2 .
+docker build -f template.dockerfile -t lwji/carpetx:sbx .
 ```
 
 The from-scratch image build compiles ~8 libraries from source (~10 min on an Apple-silicon host: dependency layer ~8 min, Cactus checkout ~1 min). Rebuilds after edits to this directory are fast (the dependency layers are cached).
@@ -26,15 +26,17 @@ The from-scratch image build compiles ~8 libraries from source (~10 min on an Ap
 sbx has its own image store: it pulls `-t` images from a registry, **not** from the local docker daemon. To use a locally built template without pushing to Docker Hub (`docker save` ~10 s for the 1.7 GB tar, `sbx template load` ~5 s):
 
 ```bash
-docker save lwji/carpetx:sbx2 -o /tmp/carpetx-sbx2.tar
-sbx template load /tmp/carpetx-sbx2.tar
+docker save lwji/carpetx:sbx -o /tmp/carpetx-sbx.tar
+sbx template load /tmp/carpetx-sbx.tar
 ```
+
+Caveat: if the tag also exists on Docker Hub, `sbx run`/`sbx create` pull the registry copy and silently overwrite a loaded template. `lwji/carpetx:sbx` is published, so for local iteration either build under a registry-free tag (e.g. `lwji/carpetx:sbx-wip`) or `docker push` the rebuilt image so the registry copy is the one you built.
 
 ## Running
 
 ```bash
 cd ~/docker-workspace/repos/CarpetX
-sbx run -t lwji/carpetx:sbx2 --name carpetx claude . ../amrex:ro
+sbx run -t lwji/carpetx:sbx --name carpetx claude . ../amrex:ro
 ```
 
 Inside the sandbox, once per sandbox (idempotent):
@@ -57,7 +59,7 @@ Named sandboxes persist across `sbx stop`/restart, so `configs/`, `exe/`, `TEST/
 For non-interactive use (no attached agent), `sbx create` + `sbx exec` mirror the above:
 
 ```bash
-sbx create -t lwji/carpetx:sbx2 --name carpetx claude . ../amrex:ro
+sbx create -t lwji/carpetx:sbx --name carpetx claude . ../amrex:ro
 sbx exec -w "$PWD" carpetx agent_scripts/sandbox/setup.sh
 sbx exec -w "$PWD" carpetx ./agent_scripts/build.sh
 sbx exec -w "$PWD" carpetx ./agent_scripts/test.sh

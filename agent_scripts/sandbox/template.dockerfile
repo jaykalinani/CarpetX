@@ -21,13 +21,13 @@
 #     is exactly one copy
 #
 # Build (context = this directory):
-#     docker build -f template.dockerfile -t lwji/carpetx:sbx .
+#     docker build -f template.dockerfile -t lwji/sandbox-templates:claude-carpetx .
 # The sandbox runtime does not share the host docker image store, so hand the
 # image to sbx directly (or push to Docker Hub):
-#     docker save lwji/carpetx:sbx -o /tmp/carpetx-sbx.tar
-#     sbx template load /tmp/carpetx-sbx.tar
+#     docker save lwji/sandbox-templates:claude-carpetx -o /tmp/claude-carpetx.tar
+#     sbx template load /tmp/claude-carpetx.tar
 # Run (from the CarpetX repo root):
-#     sbx run -t lwji/carpetx:sbx --name carpetx claude . ../amrex:ro
+#     sbx run -t lwji/sandbox-templates:claude-carpetx --name claude-CarpetX claude . ../amrex:ro
 
 # The maintained claude sandbox base: agent user (uid 1000), Claude Code,
 # docker-in-sandbox, persistent-env plumbing, tini entrypoint.

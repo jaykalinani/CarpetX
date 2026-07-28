@@ -2,9 +2,8 @@
 
 CCTK_INT num_regions "Number of refined regions"
 {
-  0:3 :: ""
+  0:100 :: ""
 } 0
-
 
 
 ################################################################################
@@ -74,7 +73,6 @@ CCTK_REAL radius_z_1[30] "z-radius of refined region for this level"
 } -1.0
 
 
-
 ################################################################################
 
 # Box 2
@@ -142,7 +140,6 @@ CCTK_REAL radius_z_2[30] "z-radius of refined region for this level"
 } -1.0
 
 
-
 ################################################################################
 
 # Box 3
@@ -204,6 +201,6505 @@ CCTK_REAL radius_y_3[30] "y-radius of refined region for this level"
 } -1.0
 
 CCTK_REAL radius_z_3[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 4
+
+KEYWORD shape_4 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_4 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_4 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_4 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_4 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_4 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_4[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_4[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_4[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_4[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 5
+
+KEYWORD shape_5 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_5 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_5 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_5 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_5 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_5 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_5[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_5[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_5[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_5[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 6
+
+KEYWORD shape_6 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_6 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_6 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_6 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_6 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_6 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_6[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_6[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_6[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_6[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 7
+
+KEYWORD shape_7 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_7 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_7 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_7 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_7 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_7 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_7[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_7[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_7[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_7[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 8
+
+KEYWORD shape_8 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_8 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_8 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_8 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_8 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_8 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_8[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_8[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_8[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_8[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 9
+
+KEYWORD shape_9 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_9 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_9 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_9 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_9 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_9 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_9[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_9[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_9[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_9[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 10
+
+KEYWORD shape_10 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_10 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_10 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_10 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_10 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_10 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_10[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_10[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_10[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_10[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 11
+
+KEYWORD shape_11 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_11 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_11 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_11 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_11 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_11 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_11[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_11[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_11[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_11[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 12
+
+KEYWORD shape_12 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_12 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_12 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_12 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_12 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_12 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_12[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_12[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_12[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_12[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 13
+
+KEYWORD shape_13 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_13 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_13 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_13 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_13 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_13 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_13[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_13[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_13[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_13[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 14
+
+KEYWORD shape_14 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_14 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_14 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_14 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_14 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_14 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_14[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_14[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_14[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_14[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 15
+
+KEYWORD shape_15 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_15 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_15 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_15 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_15 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_15 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_15[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_15[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_15[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_15[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 16
+
+KEYWORD shape_16 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_16 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_16 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_16 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_16 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_16 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_16[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_16[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_16[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_16[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 17
+
+KEYWORD shape_17 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_17 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_17 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_17 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_17 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_17 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_17[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_17[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_17[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_17[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 18
+
+KEYWORD shape_18 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_18 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_18 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_18 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_18 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_18 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_18[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_18[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_18[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_18[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 19
+
+KEYWORD shape_19 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_19 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_19 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_19 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_19 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_19 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_19[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_19[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_19[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_19[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 20
+
+KEYWORD shape_20 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_20 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_20 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_20 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_20 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_20 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_20[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_20[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_20[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_20[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 21
+
+KEYWORD shape_21 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_21 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_21 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_21 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_21 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_21 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_21[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_21[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_21[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_21[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 22
+
+KEYWORD shape_22 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_22 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_22 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_22 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_22 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_22 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_22[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_22[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_22[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_22[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 23
+
+KEYWORD shape_23 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_23 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_23 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_23 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_23 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_23 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_23[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_23[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_23[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_23[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 24
+
+KEYWORD shape_24 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_24 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_24 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_24 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_24 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_24 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_24[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_24[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_24[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_24[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 25
+
+KEYWORD shape_25 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_25 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_25 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_25 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_25 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_25 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_25[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_25[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_25[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_25[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 26
+
+KEYWORD shape_26 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_26 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_26 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_26 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_26 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_26 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_26[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_26[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_26[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_26[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 27
+
+KEYWORD shape_27 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_27 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_27 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_27 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_27 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_27 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_27[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_27[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_27[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_27[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 28
+
+KEYWORD shape_28 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_28 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_28 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_28 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_28 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_28 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_28[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_28[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_28[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_28[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 29
+
+KEYWORD shape_29 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_29 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_29 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_29 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_29 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_29 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_29[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_29[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_29[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_29[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 30
+
+KEYWORD shape_30 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_30 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_30 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_30 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_30 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_30 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_30[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_30[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_30[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_30[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 31
+
+KEYWORD shape_31 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_31 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_31 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_31 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_31 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_31 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_31[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_31[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_31[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_31[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 32
+
+KEYWORD shape_32 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_32 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_32 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_32 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_32 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_32 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_32[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_32[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_32[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_32[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 33
+
+KEYWORD shape_33 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_33 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_33 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_33 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_33 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_33 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_33[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_33[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_33[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_33[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 34
+
+KEYWORD shape_34 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_34 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_34 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_34 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_34 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_34 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_34[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_34[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_34[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_34[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 35
+
+KEYWORD shape_35 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_35 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_35 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_35 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_35 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_35 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_35[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_35[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_35[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_35[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 36
+
+KEYWORD shape_36 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_36 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_36 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_36 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_36 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_36 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_36[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_36[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_36[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_36[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 37
+
+KEYWORD shape_37 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_37 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_37 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_37 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_37 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_37 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_37[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_37[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_37[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_37[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 38
+
+KEYWORD shape_38 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_38 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_38 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_38 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_38 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_38 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_38[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_38[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_38[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_38[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 39
+
+KEYWORD shape_39 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_39 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_39 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_39 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_39 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_39 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_39[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_39[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_39[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_39[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 40
+
+KEYWORD shape_40 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_40 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_40 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_40 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_40 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_40 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_40[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_40[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_40[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_40[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 41
+
+KEYWORD shape_41 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_41 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_41 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_41 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_41 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_41 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_41[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_41[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_41[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_41[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 42
+
+KEYWORD shape_42 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_42 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_42 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_42 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_42 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_42 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_42[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_42[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_42[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_42[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 43
+
+KEYWORD shape_43 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_43 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_43 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_43 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_43 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_43 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_43[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_43[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_43[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_43[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 44
+
+KEYWORD shape_44 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_44 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_44 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_44 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_44 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_44 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_44[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_44[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_44[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_44[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 45
+
+KEYWORD shape_45 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_45 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_45 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_45 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_45 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_45 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_45[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_45[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_45[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_45[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 46
+
+KEYWORD shape_46 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_46 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_46 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_46 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_46 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_46 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_46[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_46[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_46[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_46[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 47
+
+KEYWORD shape_47 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_47 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_47 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_47 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_47 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_47 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_47[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_47[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_47[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_47[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 48
+
+KEYWORD shape_48 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_48 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_48 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_48 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_48 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_48 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_48[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_48[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_48[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_48[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 49
+
+KEYWORD shape_49 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_49 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_49 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_49 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_49 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_49 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_49[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_49[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_49[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_49[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 50
+
+KEYWORD shape_50 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_50 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_50 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_50 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_50 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_50 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_50[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_50[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_50[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_50[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 51
+
+KEYWORD shape_51 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_51 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_51 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_51 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_51 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_51 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_51[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_51[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_51[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_51[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 52
+
+KEYWORD shape_52 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_52 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_52 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_52 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_52 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_52 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_52[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_52[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_52[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_52[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 53
+
+KEYWORD shape_53 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_53 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_53 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_53 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_53 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_53 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_53[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_53[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_53[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_53[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 54
+
+KEYWORD shape_54 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_54 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_54 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_54 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_54 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_54 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_54[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_54[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_54[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_54[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 55
+
+KEYWORD shape_55 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_55 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_55 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_55 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_55 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_55 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_55[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_55[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_55[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_55[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 56
+
+KEYWORD shape_56 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_56 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_56 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_56 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_56 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_56 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_56[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_56[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_56[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_56[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 57
+
+KEYWORD shape_57 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_57 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_57 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_57 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_57 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_57 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_57[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_57[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_57[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_57[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 58
+
+KEYWORD shape_58 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_58 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_58 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_58 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_58 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_58 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_58[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_58[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_58[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_58[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 59
+
+KEYWORD shape_59 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_59 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_59 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_59 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_59 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_59 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_59[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_59[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_59[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_59[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 60
+
+KEYWORD shape_60 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_60 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_60 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_60 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_60 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_60 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_60[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_60[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_60[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_60[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 61
+
+KEYWORD shape_61 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_61 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_61 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_61 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_61 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_61 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_61[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_61[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_61[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_61[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 62
+
+KEYWORD shape_62 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_62 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_62 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_62 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_62 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_62 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_62[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_62[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_62[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_62[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 63
+
+KEYWORD shape_63 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_63 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_63 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_63 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_63 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_63 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_63[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_63[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_63[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_63[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 64
+
+KEYWORD shape_64 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_64 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_64 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_64 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_64 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_64 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_64[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_64[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_64[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_64[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 65
+
+KEYWORD shape_65 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_65 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_65 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_65 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_65 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_65 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_65[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_65[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_65[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_65[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 66
+
+KEYWORD shape_66 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_66 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_66 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_66 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_66 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_66 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_66[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_66[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_66[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_66[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 67
+
+KEYWORD shape_67 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_67 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_67 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_67 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_67 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_67 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_67[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_67[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_67[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_67[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 68
+
+KEYWORD shape_68 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_68 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_68 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_68 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_68 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_68 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_68[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_68[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_68[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_68[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 69
+
+KEYWORD shape_69 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_69 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_69 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_69 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_69 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_69 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_69[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_69[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_69[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_69[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 70
+
+KEYWORD shape_70 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_70 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_70 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_70 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_70 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_70 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_70[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_70[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_70[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_70[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 71
+
+KEYWORD shape_71 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_71 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_71 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_71 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_71 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_71 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_71[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_71[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_71[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_71[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 72
+
+KEYWORD shape_72 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_72 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_72 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_72 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_72 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_72 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_72[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_72[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_72[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_72[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 73
+
+KEYWORD shape_73 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_73 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_73 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_73 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_73 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_73 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_73[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_73[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_73[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_73[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 74
+
+KEYWORD shape_74 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_74 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_74 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_74 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_74 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_74 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_74[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_74[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_74[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_74[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 75
+
+KEYWORD shape_75 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_75 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_75 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_75 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_75 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_75 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_75[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_75[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_75[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_75[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 76
+
+KEYWORD shape_76 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_76 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_76 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_76 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_76 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_76 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_76[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_76[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_76[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_76[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 77
+
+KEYWORD shape_77 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_77 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_77 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_77 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_77 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_77 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_77[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_77[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_77[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_77[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 78
+
+KEYWORD shape_78 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_78 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_78 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_78 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_78 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_78 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_78[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_78[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_78[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_78[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 79
+
+KEYWORD shape_79 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_79 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_79 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_79 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_79 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_79 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_79[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_79[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_79[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_79[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 80
+
+KEYWORD shape_80 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_80 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_80 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_80 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_80 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_80 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_80[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_80[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_80[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_80[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 81
+
+KEYWORD shape_81 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_81 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_81 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_81 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_81 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_81 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_81[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_81[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_81[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_81[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 82
+
+KEYWORD shape_82 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_82 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_82 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_82 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_82 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_82 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_82[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_82[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_82[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_82[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 83
+
+KEYWORD shape_83 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_83 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_83 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_83 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_83 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_83 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_83[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_83[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_83[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_83[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 84
+
+KEYWORD shape_84 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_84 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_84 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_84 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_84 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_84 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_84[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_84[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_84[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_84[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 85
+
+KEYWORD shape_85 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_85 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_85 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_85 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_85 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_85 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_85[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_85[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_85[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_85[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 86
+
+KEYWORD shape_86 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_86 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_86 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_86 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_86 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_86 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_86[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_86[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_86[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_86[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 87
+
+KEYWORD shape_87 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_87 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_87 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_87 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_87 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_87 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_87[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_87[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_87[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_87[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 88
+
+KEYWORD shape_88 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_88 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_88 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_88 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_88 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_88 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_88[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_88[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_88[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_88[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 89
+
+KEYWORD shape_89 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_89 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_89 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_89 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_89 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_89 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_89[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_89[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_89[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_89[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 90
+
+KEYWORD shape_90 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_90 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_90 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_90 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_90 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_90 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_90[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_90[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_90[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_90[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 91
+
+KEYWORD shape_91 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_91 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_91 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_91 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_91 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_91 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_91[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_91[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_91[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_91[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 92
+
+KEYWORD shape_92 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_92 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_92 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_92 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_92 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_92 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_92[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_92[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_92[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_92[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 93
+
+KEYWORD shape_93 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_93 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_93 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_93 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_93 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_93 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_93[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_93[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_93[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_93[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 94
+
+KEYWORD shape_94 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_94 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_94 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_94 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_94 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_94 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_94[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_94[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_94[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_94[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 95
+
+KEYWORD shape_95 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_95 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_95 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_95 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_95 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_95 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_95[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_95[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_95[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_95[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 96
+
+KEYWORD shape_96 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_96 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_96 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_96 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_96 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_96 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_96[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_96[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_96[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_96[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 97
+
+KEYWORD shape_97 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_97 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_97 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_97 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_97 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_97 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_97[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_97[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_97[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_97[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 98
+
+KEYWORD shape_98 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_98 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_98 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_98 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_98 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_98 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_98[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_98[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_98[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_98[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 99
+
+KEYWORD shape_99 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_99 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_99 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_99 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_99 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_99 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_99[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_99[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_99[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_99[30] "z-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+
+################################################################################
+
+# Box 100
+
+KEYWORD shape_100 "Shape of refined region"
+{
+  "cube" :: "cube"
+  "sphere" :: "sphere"
+} "cube"
+
+
+
+BOOLEAN active_100 "Is this region active?"
+{
+} "yes"
+
+
+
+CCTK_INT num_levels_100 "Number of refinement levels for this centre"
+{
+  1:30 :: ""
+} 1
+
+
+
+CCTK_REAL position_x_100 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_y_100 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL position_z_100 "Position of this region"
+{
+  *:* :: ""
+} 0.0
+
+
+
+CCTK_REAL radius_100[30] "Radius of refined region for this level"
+{
+  -1 :: "illegal"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_x_100[30] "x-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_y_100[30] "y-radius of refined region for this level"
+{
+  -1 :: "ignore this radius"
+  (0:* :: ""
+} -1.0
+
+CCTK_REAL radius_z_100[30] "z-radius of refined region for this level"
 {
   -1 :: "ignore this radius"
   (0:* :: ""

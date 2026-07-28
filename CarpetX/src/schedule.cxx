@@ -1449,6 +1449,10 @@ int Initialise(tFleshConfig *config) {
     CCTK_Traverse(cctkGH, "CCTK_POSTRESTRICT");
   }
 
+  // Finalize initial data once the complete AMR hierarchy exists.
+  CCTK_Traverse(cctkGH, "CCTK_POSTRESTRICTINITIAL");
+
+
   // Checkpoint, analysis, output
   CCTK_Traverse(cctkGH, "CCTK_POSTSTEP");
   CCTK_Traverse(cctkGH, "CCTK_CPINITIAL");

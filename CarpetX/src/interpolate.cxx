@@ -368,6 +368,15 @@ extern "C" CCTK_INT CarpetX_InterpGridArrays(
   //  }
 }
 
+static void CarpetX_InterpolateAtMaxLevel(
+    const CCTK_POINTER_TO_CONST cctkGH_, const CCTK_INT npoints,
+    const CCTK_REAL *restrict const globalsx,
+    const CCTK_REAL *restrict const globalsy,
+    const CCTK_REAL *restrict const globalsz, const CCTK_INT nvars,
+    const CCTK_INT *restrict const varinds,
+    const CCTK_INT *restrict const operations, const CCTK_INT allow_boundaries,
+    const CCTK_POINTER resultptrs_, const CCTK_INT max_level);
+
 extern "C" CCTK_INT CarpetX_DriverInterpolate(
     CCTK_POINTER_TO_CONST const cctkGH, CCTK_INT const N_dims,
     CCTK_INT const local_interp_handle, CCTK_INT const param_table_handle,
@@ -422,30 +431,47 @@ extern "C" CCTK_INT CarpetX_DriverInterpolate(
     CCTK_ERROR("TableGetIntArray failed.");
   }
 
+  CCTK_INT max_level = -1;
+  n_elems = Util_TableGetInt(param_table_handle, &max_level, "max_level");
+  if (n_elems == UTIL_ERROR_TABLE_NO_SUCH_KEY) {
+    max_level = -1;
+  } else if (n_elems != 1) {
+    CCTK_VERROR("TableGetInt failed for max_level with error code %d", n_elems);
+  }
+
   const CCTK_POINTER resultptrs = (CCTK_POINTER)output_arrays;
   const bool allow_boundaries = true;
-  CarpetX_Interpolate(
+  CarpetX_InterpolateAtMaxLevel(
       cctkGH, N_interp_points, static_cast<const CCTK_REAL *>(coords[0]),
       static_cast<const CCTK_REAL *>(coords[1]),
       static_cast<const CCTK_REAL *>(coords[2]), N_output_arrays,
-      varinds.data(), operations.data(), allow_boundaries, resultptrs);
+      varinds.data(), operations.data(), allow_boundaries, resultptrs,
+      max_level);
 
   return 0;
 }
 
-extern "C" void CarpetX_Interpolate(const CCTK_POINTER_TO_CONST cctkGH_,
-                                    const CCTK_INT npoints,
-                                    const CCTK_REAL *restrict const globalsx,
-                                    const CCTK_REAL *restrict const globalsy,
-                                    const CCTK_REAL *restrict const globalsz,
-                                    const CCTK_INT nvars,
-                                    const CCTK_INT *restrict const varinds,
-                                    const CCTK_INT *restrict const operations,
-                                    const CCTK_INT allow_boundaries,
-                                    const CCTK_POINTER resultptrs_) {
+static void CarpetX_InterpolateAtMaxLevel(
+    const CCTK_POINTER_TO_CONST cctkGH_, const CCTK_INT npoints,
+    const CCTK_REAL *restrict const globalsx,
+    const CCTK_REAL *restrict const globalsy,
+    const CCTK_REAL *restrict const globalsz, const CCTK_INT nvars,
+    const CCTK_INT *restrict const varinds,
+    const CCTK_INT *restrict const operations, const CCTK_INT allow_boundaries,
+    const CCTK_POINTER resultptrs_, const CCTK_INT max_level) {
   DECLARE_CCTK_PARAMETERS;
   const cGH *restrict const cctkGH = static_cast<const cGH *>(cctkGH_);
   assert(in_global_mode(cctkGH));
+
+  int finest_active_level = -1;
+  for (const auto &patchdata : ghext->patchdata)
+    for (const auto &leveldata : patchdata.leveldata)
+      finest_active_level = std::max(finest_active_level, leveldata.level);
+
+  if (max_level >= 0 && max_level > finest_active_level)
+    CCTK_VERROR("Requested interpolation max_level=%d, but only levels 0..%d "
+                "are active",
+                int(max_level), finest_active_level);
 
   static const bool have_MultiPatch_GlobalToLocal2 =
       CCTK_IsFunctionAliased("MultiPatch_GlobalToLocal2");
@@ -605,7 +631,10 @@ extern "C" void CarpetX_Interpolate(const CCTK_POINTER_TO_CONST cctkGH_,
     }
 #endif
 
-    container.Redistribute();
+    if (max_level >= 0)
+      container.Redistribute(0, max_level);
+    else
+      container.Redistribute();
 
 #ifdef CCTK_DEBUG
     std::size_t new_nparticles = 0;
@@ -947,5 +976,20 @@ extern "C" void CarpetX_Interpolate(const CCTK_POINTER_TO_CONST cctkGH_,
       }
     }
   }
+}
+
+extern "C" void CarpetX_Interpolate(const CCTK_POINTER_TO_CONST cctkGH_,
+                                    const CCTK_INT npoints,
+                                    const CCTK_REAL *restrict const globalsx,
+                                    const CCTK_REAL *restrict const globalsy,
+                                    const CCTK_REAL *restrict const globalsz,
+                                    const CCTK_INT nvars,
+                                    const CCTK_INT *restrict const varinds,
+                                    const CCTK_INT *restrict const operations,
+                                    const CCTK_INT allow_boundaries,
+                                    const CCTK_POINTER resultptrs_) {
+  CarpetX_InterpolateAtMaxLevel(cctkGH_, npoints, globalsx, globalsy, globalsz,
+                                nvars, varinds, operations, allow_boundaries,
+                                resultptrs_, -1);
 }
 } // namespace CarpetX

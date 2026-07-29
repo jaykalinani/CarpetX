@@ -2348,8 +2348,14 @@ int Barrier(const cGH *restrict cctkGH) {
 void CarpetX_CallScheduleGroup(void *cctkGH_, const char *groupname) {
   cGH *cctkGH = static_cast<cGH *>(cctkGH_);
   static Timer timer("CallScheduleGroup");
-  Interval interval(timer);
+  static thread_local int schedule_group_depth = 0;
+  const bool outermost = schedule_group_depth++ == 0;
+  if (outermost)
+    timer.start();
   int ierr = CCTK_ScheduleTraverse(groupname, cctkGH, CallFunction);
+  if (outermost)
+    timer.stop();
+  --schedule_group_depth;
   assert(!ierr);
 }
 

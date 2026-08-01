@@ -671,8 +671,11 @@ int SyncGroupsByDirISubcycling(const cGH *restrict cctkGH, int numgroups,
       auto &restrict groupdata = *leveldata.groupdata.at(gi);
       assert(!groupdata.mfab.empty());
 
-      const bool evolving_subiter =
-          groupdata.do_evolve && leveldata.iteration > 0;
+      // Level zero has no refinement boundary. FillPatch_Sync therefore fills
+      // all of its ghost zones even while an evolved group is substepping.
+      const bool evolving_subiter = leveldata.level > 0 &&
+                                    groupdata.do_evolve &&
+                                    leveldata.iteration > 0;
 
       for (int tl = 0; tl < sync_tl0; ++tl) {
         for (int vi = 0; vi < groupdata.numvars; ++vi) {

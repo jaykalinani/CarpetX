@@ -106,6 +106,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   Interval interval(timer);
 
   const CCTK_REAL dt = CCTK_DELTA_TIME;
+  const CCTK_REAL saved_delta_time = cctkGH->cctk_delta_time;
   current_step_delta_time = dt;
 
   static Timer timer_setup("ODESolvers::Solve::setup");
@@ -174,9 +175,10 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
     if (verbose)
       CCTK_VINFO("Taking implicit step #%d at t=%g with dt=%g", n,
                  double(cctkGH->cctk_time), double(step_dt));
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = step_dt;
+    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) =
+        step_dt * cctkGH->cctk_timefac;
     CallScheduleGroup(cctkGH, "ODESolvers_ImplicitStep");
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = dt;
+    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = saved_delta_time;
     var.check_valid(make_valid_int(),
                     "ODESolvers after calling ODESolvers_ImplicitStep");
     mark_invalid(dep_groups);
@@ -257,12 +259,14 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
         auto &src_band = *groupdata.ks_source_band[s];
         assert(src_band.ixType() == rhs_mf.ixType());
         assert(src_band.nComp() == rhs_mf.nComp());
-        // Fill the source band's interior from the RHS interior. The band is
-        // zero-ghost and feeds band->band prolongation, which pulls from valid
-        // interior cells, so the old same-level FillBoundary is unnecessary.
+        const auto &geom = CarpetX::ghext->patchdata.at(leveldata.patch)
+                               .amrcore->Geom(leveldata.level);
+        // Fill the source band from the RHS interior, including periodic
+        // images when a refinement region overlaps a periodic boundary. The
+        // source-band boxes can extend outside the domain even though they
+        // have no ghost cells of their own.
         src_band.ParallelCopy(rhs_mf, 0, 0, src_band.nComp(), amrex::IntVect{0},
-                              amrex::IntVect{0},
-                              amrex::Periodicity::NonPeriodic());
+                              amrex::IntVect{0}, geom.periodicity());
       }
     });
     synchronize();
@@ -280,9 +284,10 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
         auto &src_band = *groupdata.old_source_band;
         assert(src_band.ixType() == var_mf.ixType());
         assert(src_band.nComp() == var_mf.nComp());
+        const auto &geom = CarpetX::ghext->patchdata.at(leveldata.patch)
+                               .amrcore->Geom(leveldata.level);
         src_band.ParallelCopy(var_mf, 0, 0, src_band.nComp(), amrex::IntVect{0},
-                              amrex::IntVect{0},
-                              amrex::Periodicity::NonPeriodic());
+                              amrex::IntVect{0}, geom.periodicity());
       }
     });
     synchronize();
@@ -386,17 +391,19 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
           statecomp_t g;
           if (diag == 0) {
             calcimplicitrhs(stage + 1);
-            g = var.copy(make_valid_int());
-            statecomp_t::lincomb(g, 0.0, vector<CCTK_REAL>{1.0},
-                                 vector<const statecomp_t *>{&rhs},
-                                 make_valid_int());
+            g = rhs.copy(make_valid_int());
           } else {
-            const auto base = var.copy(make_valid_int());
+            // Preserve the stage-state ghost validity while retaining the
+            // pre-implicit-step interior used to recover g(Y_i).
+            const auto base = var.copy(make_valid_all());
             calcimplicitstep(stage + 1, diag * dt);
             calcys_rmbnd(stage + 1);
             calcpoststep();
 
-            g = var.copy(make_valid_int());
+            // Allocate g from the RHS group so that writing the scratch value
+            // does not invalidate the evolved state restored above.
+            rhs.set_zero(make_valid_int());
+            g = rhs.copy(make_valid_int());
             statecomp_t::lincomb(
                 g, 0.0,
                 vector<CCTK_REAL>{1.0 / (diag * dt), -1.0 / (diag * dt)},

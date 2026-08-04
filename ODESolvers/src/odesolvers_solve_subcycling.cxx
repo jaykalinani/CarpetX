@@ -140,6 +140,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   active_levels->loop_serially([&](const auto &leveldata) {
     for (const int gi : var_groups) {
       const auto &gd = *leveldata.groupdata.at(gi);
+      leveldata.build_cf_mask(gd.indextype, gd.nghostzones);
       leveldata.build_bands(gd);
     }
   });
@@ -172,6 +173,8 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   const auto calcimplicitstep = [&](const int n, const CCTK_REAL step_dt) {
     if (step_dt == 0)
       return;
+    var.check_valid(make_valid_all(),
+                    "ODESolvers before calling ODESolvers_ImplicitStep");
     if (verbose)
       CCTK_VINFO("Taking implicit step #%d at t=%g with dt=%g", n,
                  double(cctkGH->cctk_time), double(step_dt));
@@ -207,8 +210,17 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   const auto calcpoststep = [&]() {
     CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
   };
-  // calculate Ys from the k-stage bands and old on the mesh refinement boundary
-  const auto calcys_rmbnd = [&](const int stage) {
+  const auto calcpreimplicit = [&]() {
+    assert(!in_pre_implicit_stage);
+    in_pre_implicit_stage = 1;
+    CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+    in_pre_implicit_stage = 0;
+  };
+  // Calculate Ys on the mesh refinement boundary. Explicit RK methods use
+  // dense output from their k-stage bands; IMEX methods interpolate between
+  // accepted coarse-step endpoints.
+  const auto calcys_rmbnd = [&](const int stage,
+                                const CCTK_REAL stage_time = -1.0) {
     if (verbose)
       CCTK_VINFO(
           "Fill refinement boundary ghost zones using Ys for stage #%d at t=%g",
@@ -225,19 +237,35 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
       const int virtual_end = ghext->num_rk_stages + 1;
       CCTK_REAL xsi =
           (leveldata.iteration == prev_leveldata.iteration) ? 0.5 : 0.0;
-      if (stage == virtual_end) {
-        xsi += 0.5;
+      if (stage_time >= 0.0) {
+        xsi += 0.5 * stage_time;
+        Subcycling::CalcYfFromEndpoints_MFlevel(leveldata, var_groups,
+                                                /*Yf_tl=*/0, xsi);
+      } else {
+        if (stage == virtual_end)
+          xsi += 0.5;
+        const int stage0 = (stage == virtual_end ? 1 : stage);
+        if (ghext->num_rk_stages == 3)
+          Subcycling::CalcYfFromKcs_MFlevel<3>(
+              leveldata, var_groups, /*Yf_tl=*/0, dt * 2, xsi, stage0);
+        else
+          Subcycling::CalcYfFromKcs_MFlevel<4>(
+              leveldata, var_groups, /*Yf_tl=*/0, dt * 2, xsi, stage0);
       }
-      const int stage0 = (stage == virtual_end ? 1 : stage);
-      if (ghext->num_rk_stages == 3)
-        Subcycling::CalcYfFromKcs_MFlevel<3>(leveldata, var_groups, /*Yf_tl=*/0,
-                                             dt * 2, xsi, stage0);
-      else
-        Subcycling::CalcYfFromKcs_MFlevel<4>(leveldata, var_groups, /*Yf_tl=*/0,
-                                             dt * 2, xsi, stage0);
     });
     synchronize();
+
+    // calcys_rmbnd writes only coarse-fine ghosts. The stage lincomb also
+    // touches the allocated halo even though only its interior is valid, so
+    // refresh same-level and physical-boundary ghosts before any post-step or
+    // RHS routine can consume them. GhostOnly preserves the temporally
+    // interpolated coarse-fine values written above.
+    SyncGroupsByDirIGhostOnly(cctkGH, var_groups.size(), var_groups.data(),
+                              nullptr, /*tl=*/0);
+    synchronize();
     var.set_valid(make_valid_all());
+    var.check_valid(make_valid_all(),
+                    "ODESolvers after filling stage ghost zones");
   };
   // set ks in the interior which will be used for prolongation later
   const auto setks = [&](const int stage) {
@@ -296,7 +324,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   // fine level's consumer bands: the RK k-stage bands (written by setks) and
   // the single old-state band (written by fill_old_source_band). Both feed
   // calcys_rmbnd.
-  const auto prolongate_bands = [&]() {
+  const auto prolongate_bands = [&](const bool imex_endpoints_only = false) {
     active_levels->loop_coarse_to_fine([&](const auto &restrict leveldata) {
       const int level = leveldata.level;
       if (level == 0)
@@ -313,16 +341,19 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
         const auto &coarsegroupdata =
             *coarseleveldata.groupdata.at(var_groups[i]);
         amrex::Interpolater *const interpolator = groupdata.interpolator;
-        for (int s = 0; s < max_num_rk_stages; ++s) {
-          // Skip where either band is absent (level 0 has no consumer band, the
-          // finest level no source band).
-          if (!groupdata.ks_consumer_band[s] ||
-              !coarsegroupdata.ks_source_band[s])
+        const int num_bands = imex_endpoints_only ? 1 : max_num_rk_stages;
+        for (int s = 0; s < num_bands; ++s) {
+          // IMEX slot zero is filled directly from the parent's accepted full
+          // state. Explicit RK slots use the compact k-stage source bands.
+          const amrex::MultiFab *const source =
+              imex_endpoints_only
+                  ? coarsegroupdata.mfab.at(0).get()
+                  : coarsegroupdata.ks_source_band[s].get();
+          if (!groupdata.ks_consumer_band[s] || !source)
             continue;
           CarpetX::FillPatch_ProlongateToBand(
               groupdata, coarsegroupdata, *groupdata.ks_consumer_band[s],
-              *coarsegroupdata.ks_source_band[s], fgeom, cgeom, interpolator,
-              groupdata.bcrecs);
+              *source, fgeom, cgeom, interpolator, groupdata.bcrecs);
         }
         // Old-state band (single), reusing the same band->band helper.
         if (groupdata.old_consumer_band && coarsegroupdata.old_source_band)
@@ -352,7 +383,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
 
         if (var_groups.size() > 0) {
           fill_old_source_band();
-          prolongate_bands();
+          prolongate_bands(/*imex_endpoints_only=*/true);
         }
 
         const auto define_stage_base = [&](const int stage) {
@@ -383,39 +414,46 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
         for (int stage = 0; stage < nstages; ++stage) {
           if (stage > 0) {
             define_stage_base(stage);
-            calcys_rmbnd(stage + 1);
-            calcpoststep();
+            calcys_rmbnd(stage + 1, cs.at(stage));
+            calcpreimplicit();
+            // PostStep routines may update evolved interiors (for example,
+            // conservative-to-primitive atmosphere repair) and their regular
+            // subcycling SYNC does not refill coarse-fine ghosts during a fine
+            // substep. Restore the time-interpolated refinement boundary
+            // before the diagonal implicit solve consumes the stage state.
+            calcys_rmbnd(stage + 1, cs.at(stage));
           }
 
           const CCTK_REAL diag = a_imp.at(stage).at(stage);
           statecomp_t g;
           if (diag == 0) {
             calcimplicitrhs(stage + 1);
+            CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
             g = rhs.copy(make_valid_int());
           } else {
-            // Preserve the stage-state ghost validity while retaining the
-            // pre-implicit-step interior used to recover g(Y_i).
+            // Scratch copies share the evolved group's validity metadata.
+            // Preserve the stage ghost validity while retaining the
+            // pre-implicit interior used to recover g(Y_i).
             const auto base = var.copy(make_valid_all());
             calcimplicitstep(stage + 1, diag * dt);
-            calcys_rmbnd(stage + 1);
+            calcys_rmbnd(stage + 1, cs.at(stage));
             calcpoststep();
 
-            // Allocate g from the RHS group so that writing the scratch value
-            // does not invalidate the evolved state restored above.
-            rhs.set_zero(make_valid_int());
-            g = rhs.copy(make_valid_int());
+            // Use the update accepted by the diagonal solver as the effective
+            // implicit operator. This remains consistent when that solver
+            // applies a limiter, floor, or realizability repair.
             statecomp_t::lincomb(
-                g, 0.0,
+                rhs, 0.0,
                 vector<CCTK_REAL>{1.0 / (diag * dt), -1.0 / (diag * dt)},
                 vector<const statecomp_t *>{&var, &base}, make_valid_int());
+            rhs.check_valid(make_valid_int(),
+                            "ODESolvers effective implicit RHS");
+            CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
+            g = rhs.copy(make_valid_int());
           }
 
           calcrhs(stage + 1);
           auto f = rhs.copy(make_valid_int());
-          statecomp_t::lincomb(rhs, 0.0, vector<CCTK_REAL>{1.0, 1.0},
-                               vector<const statecomp_t *>{&f, &g},
-                               make_valid_int());
-          setks(stage + 1);
           fks.push_back(std::move(f));
           gks.push_back(std::move(g));
         }
@@ -441,7 +479,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
                         "ODESolvers after defining IMEX final state");
         mark_invalid(dep_groups);
         *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt;
-        calcys_rmbnd(nstages + 1);
+        calcys_rmbnd(nstages + 1, 1.0);
         calcpoststep();
       };
 
@@ -672,16 +710,20 @@ extern "C" void ODESolvers_Solve_Subcycling_Recovery(CCTK_ARGUMENTS) {
       }
       if (!have_bands)
         return;
-      // Mirror the previous fine substep's calcys_rmbnd at the virtual
-      // end-of-step: base offset 0.0 plus the +0.5 give xsi = 0.5, stage0 = 1,
-      // dtc = dt*2.
       const CCTK_REAL xsi = 0.5;
-      if (ghext->num_rk_stages == 3)
+      if (CCTK_EQUALS(method, "IMEX42L") || CCTK_EQUALS(method, "IMEX32L")) {
+        // IMEX checkpoints store the parent's accepted new endpoint in band
+        // slot zero, so recovery uses the same convex endpoint interpolation
+        // as the uninterrupted solve.
+        Subcycling::CalcYfFromEndpoints_MFlevel(leveldata, var_groups,
+                                                /*Yf_tl=*/0, xsi);
+      } else if (ghext->num_rk_stages == 3) {
         Subcycling::CalcYfFromKcs_MFlevel<3>(leveldata, var_groups, /*Yf_tl=*/0,
                                              dt * 2, xsi, /*stage0=*/1);
-      else
+      } else {
         Subcycling::CalcYfFromKcs_MFlevel<4>(leveldata, var_groups, /*Yf_tl=*/0,
                                              dt * 2, xsi, /*stage0=*/1);
+      }
     });
     synchronize();
     var.set_valid(make_valid_all());

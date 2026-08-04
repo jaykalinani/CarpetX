@@ -4,9 +4,14 @@ namespace ODESolvers {
 using namespace std;
 
 CCTK_REAL current_step_delta_time = 0.0;
+CCTK_INT in_pre_implicit_stage = 0;
 
 extern "C" CCTK_REAL ODESolvers_ProvideStepDeltaTime() {
   return current_step_delta_time;
+}
+
+extern "C" CCTK_INT ODESolvers_ProvideInPreImplicitStage() {
+  return in_pre_implicit_stage;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

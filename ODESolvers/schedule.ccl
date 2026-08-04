@@ -153,6 +153,10 @@ if(use_subcycling) {
   {
   } "Take an implicit step everywhere on the grid"
 
+  SCHEDULE GROUP ODESolvers_AfterImplicitRHS
+  {
+  } "Expose the effective implicit RHS to coupled systems"
+
   SCHEDULE GROUP ODESolvers_EstimateError
   {
   } "Estimate discretization error (for regridding)"
@@ -236,7 +240,11 @@ if(use_subcycling) {
   {
   } "Take an implicit step everywhere on the grid"
 
-  SCHEDULE GROUP ODESolvers_PostStep IN ODESolvers_CalledBySolve AFTER ODESolvers_ImplicitStep
+  SCHEDULE GROUP ODESolvers_AfterImplicitRHS IN ODESolvers_CalledBySolve AFTER ODESolvers_ImplicitStep
+  {
+  } "Expose the effective implicit RHS to coupled systems"
+
+  SCHEDULE GROUP ODESolvers_PostStep IN ODESolvers_CalledBySolve AFTER ODESolvers_AfterImplicitRHS
   {
   } "Apply boundary conditions to state vector, and project if necessary"
 

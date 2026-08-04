@@ -41,6 +41,7 @@ namespace ODESolvers {
 using namespace std;
 
 extern CCTK_REAL current_step_delta_time;
+extern CCTK_INT in_pre_implicit_stage;
 ////////////////////////////////////////////////////////////////////////////////
 
 // Taken from <https://en.cppreference.com/w/cpp/experimental/make_array>

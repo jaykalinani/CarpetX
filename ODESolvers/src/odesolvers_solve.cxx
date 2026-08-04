@@ -150,6 +150,12 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
                     "ODESolvers after calling ODESolvers_ImplicitStep");
     mark_invalid(dep_groups);
   };
+  const auto calcpreimplicit = [&]() {
+    assert(!in_pre_implicit_stage);
+    in_pre_implicit_stage = 1;
+    CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+    in_pre_implicit_stage = 0;
+  };
   // t = t_0 + c
   // var = a_0 * var + \Sum_i a_i * var_i
   const auto calcupdate = [&](const int n, const CCTK_REAL c,
@@ -211,7 +217,6 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
           mark_invalid(dep_groups);
           *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
               old_time + cs.at(stage) * dt;
-          CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
         };
 
         for (int stage = 0; stage < nstages; ++stage) {
@@ -219,23 +224,33 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
             *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time;
           } else {
             define_stage_base(stage);
+            calcpreimplicit();
           }
 
           const CCTK_REAL diag = a_imp.at(stage).at(stage);
           if (diag == 0) {
             calcimplicitrhs(stage + 1);
+            CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
             gks.push_back(copy_state(rhs, make_valid_int()));
           } else {
-            const auto base = copy_state(var, make_valid_int());
+            // Scratch copies share the evolved group's validity metadata.
+            // Preserve the stage ghost validity while retaining the
+            // pre-implicit interior used to recover g(Y_i).
+            const auto base = copy_state(var, make_valid_all());
             calcimplicitstep(stage + 1, diag * dt);
             CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
 
-            auto g = copy_state(var, make_valid_int());
+            // Use the update accepted by the diagonal solver as the effective
+            // implicit operator. This remains consistent when that solver
+            // applies a limiter, floor, or realizability repair.
             statecomp_t::lincomb(
-                g, 0.0,
+                rhs, 0.0,
                 vector<CCTK_REAL>{1.0 / (diag * dt), -1.0 / (diag * dt)},
                 vector<const statecomp_t *>{&var, &base}, make_valid_int());
-            gks.push_back(std::move(g));
+            rhs.check_valid(make_valid_int(),
+                            "ODESolvers effective implicit RHS");
+            CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
+            gks.push_back(copy_state(rhs, make_valid_int()));
           }
 
           calcrhs(stage + 1);

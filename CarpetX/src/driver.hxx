@@ -394,24 +394,16 @@ struct GHExt {
       //                     finest level.
       //   consumer_band_* : this level's own cf-ghost region (fpc.ba_fine_patch
       //                     w.r.t. the parent). Empty at level 0.
-      // A non-null BoxArray slot (even if the BoxArray itself is empty) means
-      // the geometry for that centering has been built; both slots are set
-      // together. The DistributionMapping is the fpc.dm_patch the consumer band
-      // must share for the band->band FillPatchInterp to stay local. Shared by
-      // both band families (ks_* and old_*).
+      // The DistributionMapping is the fpc.dm_patch the consumer band must
+      // share for the band->band FillPatchInterp to stay local. Both the box
+      // arrays and mappings are refreshed from the current level layouts by
+      // build_bands and shared by the ks_* and old_* band families.
       mutable std::array<std::unique_ptr<amrex::BoxArray>, 8> source_band_ba;
       mutable std::array<std::unique_ptr<amrex::DistributionMapping>, 8>
           source_band_dm;
       mutable std::array<std::unique_ptr<amrex::BoxArray>, 8> consumer_band_ba;
       mutable std::array<std::unique_ptr<amrex::DistributionMapping>, 8>
           consumer_band_dm;
-
-      // The child (level+1) BoxArray the source band was last built against.
-      // A mismatch with the current child layout (which AMReX may have changed
-      // without re-making this coarser level) rebuilds the source band. null
-      // means not yet built; an empty BoxArray means there was no child.
-      mutable std::array<std::unique_ptr<amrex::BoxArray>, 8>
-          source_band_child_ba;
 
       // Returns the coarse-fine ghost mask for this (level, centering), or
       // nullptr at level 0 / when subcycling is disabled. Pure reader,

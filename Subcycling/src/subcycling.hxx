@@ -18,6 +18,57 @@
 namespace Subcycling {
 
 /**
+ * \brief Scatter a rectangular interpolation band into coarse-fine ghosts.
+ *
+ * The consumer-band boxes cover the coarse-fine ghost region, but their
+ * rectangular bounding boxes can also overlap valid cells in another FAB. A
+ * direct ParallelCopy into the evolved MultiFab would overwrite those valid
+ * cells. First scatter onto the destination layout, then use the coarse-fine
+ * mask to copy only the intended ghost cells.
+ */
+CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
+    CarpetX::GHExt::PatchData::LevelData &leveldata,
+    const CarpetX::GHExt::PatchData::LevelData::GroupData &groupdata,
+    amrex::MultiFab &dst, const amrex::MultiFab &band) {
+  const int nvars = groupdata.numvars;
+  assert(dst.nComp() >= nvars);
+  assert(band.nComp() >= nvars);
+
+  const amrex::IntVect ng(groupdata.nghostzones[0], groupdata.nghostzones[1],
+                          groupdata.nghostzones[2]);
+  amrex::iMultiFab *const cf_mask =
+      leveldata.get_cf_mask(groupdata.indextype, groupdata.nghostzones);
+  assert(cf_mask);
+  assert(cf_mask->boxArray() == dst.boxArray());
+  assert(cf_mask->DistributionMap() == dst.DistributionMap());
+
+  amrex::MultiFab scatter(dst.boxArray(), dst.DistributionMap(), nvars, ng);
+  amrex::iMultiFab scatter_coverage(dst.boxArray(), dst.DistributionMap(), 1,
+                                    ng);
+  amrex::iMultiFab band_coverage(band.boxArray(), band.DistributionMap(), 1,
+                                 amrex::IntVect{0});
+  scatter_coverage.setVal(0);
+  band_coverage.setVal(1);
+  scatter.ParallelCopy(band, 0, 0, nvars, amrex::IntVect{0}, ng,
+                       amrex::Periodicity::NonPeriodic());
+  scatter_coverage.ParallelCopy(band_coverage, 0, 0, 1,
+                                amrex::IntVect{0}, ng,
+                                amrex::Periodicity::NonPeriodic());
+
+  const auto dst_arrs = dst.arrays();
+  const auto scatter_arrs = scatter.const_arrays();
+  const auto mask_arrs = cf_mask->const_arrays();
+  const auto coverage_arrs = scatter_coverage.const_arrays();
+  amrex::ParallelFor(
+      dst, ng, nvars,
+      [=] AMREX_GPU_DEVICE(int b, int i, int j, int k, int n) noexcept {
+        if (mask_arrs[b](i, j, k) != 0 &&
+            coverage_arrs[b](i, j, k) != 0)
+          dst_arrs[b](i, j, k, n) = scatter_arrs[b](i, j, k, n);
+      });
+}
+
+/**
  * \brief MF-level fused entry point. Dispatches one amrex::ParallelFor per
  *        evolved group per level, fused across all local boxes and all
  *        components of the group.
@@ -27,8 +78,7 @@ namespace Subcycling {
  * region, filled by band->band prolongation from the parent's source bands).
  * The fine old state u(t0) is staged onto a band of the same geometry, the
  * dense-output value Yf is computed in place on that band, and Yf is scattered
- * into the fine state's ghost halo. Iterating the band's own BoxArray makes the
- * old cf-mask gate redundant: the band covers exactly the cf-ghost cells.
+ * through the coarse-fine mask into the fine state's ghost halo.
  *
  * \param leveldata Per-level data (provides groupdata / bands).
  * \param Yfs       Cactus group indices receiving the dense-output value.
@@ -70,9 +120,6 @@ CalcYfFromKcs_MFlevel(CarpetX::GHExt::PatchData::LevelData &leveldata,
     const amrex::MultiFab &cb0 = *groupdata.ks_consumer_band[0];
     const amrex::BoxArray &ba = cb0.boxArray();
     const amrex::DistributionMapping &dm = cb0.DistributionMap();
-
-    const amrex::IntVect ng(groupdata.nghostzones[0], groupdata.nghostzones[1],
-                            groupdata.nghostzones[2]);
 
     // Stage the fine old state u(t_n) from old_consumer_band (same BA/DM, so a
     // direct Copy suffices); Yf is then computed in place on yf_band.
@@ -232,10 +279,60 @@ CalcYfFromKcs_MFlevel(CarpetX::GHExt::PatchData::LevelData &leveldata,
     // Wait for the device kernel before the scatter reads yf_band.
     amrex::Gpu::synchronize();
 
-    // Scatter the band (cf-ghost values of Yf) into the fine state's ghost
-    // halo, mirroring FillPatch_Prolongate's final ParallelCopy.
-    Yf_mf.ParallelCopy(yf_band, 0, 0, nvars, amrex::IntVect{0}, ng,
-                       amrex::Periodicity::NonPeriodic());
+    ScatterBandToCoarseFineGhosts(leveldata, groupdata, Yf_mf, yf_band);
+  }
+}
+
+/**
+ * \brief Fill coarse-fine ghosts by linear interpolation between accepted
+ *        coarse-step endpoints.
+ *
+ * Additive IMEX stage derivatives cannot be passed to the classical RK3/RK4
+ * dense-output formula above. In particular, the explicit and implicit
+ * operators can be individually large while cancelling in the accepted
+ * solution. Interpolating the accepted endpoints is second-order accurate in
+ * time, matching IMEX32L and IMEX42L, and is a convex operation for
+ * \f$0\leq\theta\leq1\f$.
+ *
+ * The old endpoint is held in old_consumer_band. For IMEX solves only,
+ * ks_consumer_band[0] is reused as scratch storage for the accepted new
+ * endpoint; it does not contain a stage derivative.
+ */
+CCTK_HOST inline void CalcYfFromEndpoints_MFlevel(
+    CarpetX::GHExt::PatchData::LevelData &leveldata,
+    const std::vector<int> &Yfs, const int Yf_tl, const CCTK_REAL theta) {
+  assert(theta >= 0.0 && theta <= 1.0);
+
+  for (const int gi : Yfs) {
+    const auto &groupdata = *leveldata.groupdata.at(gi);
+    if (!groupdata.ks_consumer_band[0])
+      continue;
+
+    assert(groupdata.old_consumer_band);
+    const amrex::MultiFab &old_band = *groupdata.old_consumer_band;
+    const amrex::MultiFab &new_band = *groupdata.ks_consumer_band[0];
+    assert(old_band.boxArray() == new_band.boxArray());
+    assert(old_band.DistributionMap() == new_band.DistributionMap());
+    assert(old_band.nComp() == new_band.nComp());
+
+    const int nvars = groupdata.numvars;
+    amrex::MultiFab yf_band(old_band.boxArray(), old_band.DistributionMap(),
+                            nvars, 0);
+    const auto old_arrs = old_band.const_arrays();
+    const auto new_arrs = new_band.const_arrays();
+    const auto yf_arrs = yf_band.arrays();
+    amrex::ParallelFor(
+        yf_band, amrex::IntVect{0}, nvars,
+        [=] AMREX_GPU_DEVICE(int b, int i, int j, int k, int n) noexcept {
+          const CCTK_REAL old_value = old_arrs[b](i, j, k, n);
+          const CCTK_REAL new_value = new_arrs[b](i, j, k, n);
+          yf_arrs[b](i, j, k, n) =
+              (1.0 - theta) * old_value + theta * new_value;
+        });
+    amrex::Gpu::synchronize();
+
+    amrex::MultiFab &Yf_mf = *groupdata.mfab.at(Yf_tl);
+    ScatterBandToCoarseFineGhosts(leveldata, groupdata, Yf_mf, yf_band);
   }
 }
 

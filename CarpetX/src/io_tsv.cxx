@@ -51,11 +51,11 @@ void WriteTSVold(const cGH *restrict cctkGH, const std::string &filename,
       const auto &mfab = *groupdata.mfab.at(tl);
       for (amrex::MFIter mfi(mfab); mfi.isValid(); ++mfi) {
         const amrex::Array4<const CCTK_REAL> &vars = mfab.array(mfi);
-        const auto &imin = vars.begin;
-        const auto &imax = vars.end;
-        for (int k = imin.z; k < imax.z; ++k) {
-          for (int j = imin.y; j < imax.y; ++j) {
-            for (int i = imin.x; i < imax.x; ++i) {
+        const auto imin = amrex::lbound(vars);
+        const auto imax = amrex::ubound(vars);
+        for (int k = imin.z; k <= imax.z; ++k) {
+          for (int j = imin.y; j <= imax.y; ++j) {
+            for (int i = imin.x; i <= imax.x; ++i) {
               const std::array<int, dim> I{i, j, k};
               std::array<CCTK_REAL, dim> x;
               for (int d = 0; d < dim; ++d)
@@ -300,9 +300,12 @@ void WriteTSVGFs(const cGH *restrict cctkGH, const std::string &filename,
                                  (groupdata.indextype[d] == 0 && f == 1) &&
                          symmetries[f][d] != symmetry_t::none;
 
-        const vect<int, dim> varmin = {vars.begin.x, vars.begin.y,
-                                       vars.begin.z};
-        const vect<int, dim> varmax = {vars.end.x, vars.end.y, vars.end.z};
+        const auto vars_lo = amrex::lbound(vars);
+        const auto vars_len = amrex::length(vars);
+        const vect<int, dim> varmin = {vars_lo.x, vars_lo.y, vars_lo.z};
+        const vect<int, dim> varmax = {
+            vars_lo.x + vars_len.x, vars_lo.y + vars_len.y,
+            vars_lo.z + vars_len.z};
 
         // Skip ghost points but keep boundary points
         const vect<int, dim> intmin = varmin + !bbox[0] * nghosts;

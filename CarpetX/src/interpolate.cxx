@@ -78,8 +78,9 @@ template <typename T, int order, int centering> struct interpolator {
   template <int dir>
   std::enable_if_t<(dir == -1), T>
   interpolate(const vect<int, dim> &i, const vect<CCTK_REAL, dim> &di) const {
-    const amrex::IntVect j(i[0] + vars.begin.x, i[1] + vars.begin.y,
-                           i[2] + vars.begin.z);
+    const auto vars_lo = amrex::lbound(vars);
+    const amrex::IntVect j(i[0] + vars_lo.x, i[1] + vars_lo.y,
+                           i[2] + vars_lo.z);
 #ifdef CCTK_DEBUG
     assert(vars.contains(j[0], j[1], j[2]));
 #endif
@@ -247,9 +248,10 @@ template <typename T, int order, int centering> struct interpolator {
     // const auto x1 = x0 + (grid.lsh - 1 - indextype) * grid.dx;
     const auto dx = grid.dx;
 
-    assert(vars.end.x - vars.begin.x == grid.lsh[0] - indextype[0]);
-    assert(vars.end.y - vars.begin.y == grid.lsh[1] - indextype[1]);
-    assert(vars.end.z - vars.begin.z == grid.lsh[2] - indextype[2]);
+    const auto vars_len = amrex::length(vars);
+    assert(vars_len.x == grid.lsh[0] - indextype[0]);
+    assert(vars_len.y == grid.lsh[1] - indextype[1]);
+    assert(vars_len.z == grid.lsh[2] - indextype[2]);
 
     // We assume that the input is synchronized, i.e. that all ghost
     // zones are valid, but all outer boundaries are invalid.

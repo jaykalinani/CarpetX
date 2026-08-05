@@ -599,8 +599,8 @@ checksums_t calculate_checksums(
 
       for (int vi = 0; vi < groupdata.numvars; ++vi) {
         for (int tl = 0; tl < int(groupdata.valid.size()); ++tl) {
-          const tiletag_t tiletag{patch, level, component, groupdata.groupindex,
-                                  vi,    tl};
+          const int gi = groupdata.groupindex;
+          const tiletag_t tiletag(patch, level, component, gi, vi, tl);
 
           const auto &valid = groupdata.valid.at(tl).at(vi).get();
           // No information given for this timelevel; assume not written
@@ -676,8 +676,8 @@ void check_checksums(const checksums_t &checksums,
 
       for (int vi = 0; vi < groupdata.numvars; ++vi) {
         for (int tl = 0; tl < int(groupdata.valid.size()); ++tl) {
-          const tiletag_t tiletag{patch, level, component, groupdata.groupindex,
-                                  vi,    tl};
+          const int gi = groupdata.groupindex;
+          const tiletag_t tiletag(patch, level, component, gi, vi, tl);
 
           if (!checksums.count(tiletag))
             continue;

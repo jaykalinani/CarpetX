@@ -1101,6 +1101,10 @@ bool all_levels_synchronized() {
   return true;
 }
 
+extern "C" CCTK_INT CarpetX_ProvideAllLevelsSynchronized() {
+  return all_levels_synchronized();
+}
+
 std::string subcycling_band_tag(const band_kind kind, const int stage) {
   std::ostringstream buf;
   switch (kind) {

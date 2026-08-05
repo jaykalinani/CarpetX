@@ -84,6 +84,9 @@ PROVIDES FUNCTION MultiPatch_GetBoundarySizesAndTypes WITH CarpetX_GetBoundarySi
 CCTK_INT FUNCTION GetCallFunctionCount()
 PROVIDES FUNCTION GetCallFunctionCount WITH CarpetX_GetCallFunctionCount LANGUAGE C
 
+CCTK_INT FUNCTION CarpetX_AllLevelsSynchronized()
+PROVIDES FUNCTION CarpetX_AllLevelsSynchronized WITH CarpetX_ProvideAllLevelsSynchronized LANGUAGE C
+
 void FUNCTION GetLoopBoxAll(
   CCTK_POINTER_TO_CONST IN cctkGH,
   CCTK_INT IN size,

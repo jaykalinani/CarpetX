@@ -217,11 +217,11 @@ void statecomp_t::lincomb(const statecomp_t &dst, const CCTK_REAL scale,
       for (size_t n = 0; n < N; ++n)
         srcvars[n] = srcs[n]->mfabs.at(m)->const_array(mfi);
       for (size_t n = 0; n < N; ++n) {
-        assert(srcvars[n].jstride == dstvar.jstride);
-        assert(srcvars[n].kstride == dstvar.kstride);
-        assert(srcvars[n].nstride == dstvar.nstride);
+        assert(srcvars[n].template get_stride<1>() == dstvar.get_stride<1>());
+        assert(srcvars[n].template get_stride<2>() == dstvar.get_stride<2>());
+        assert(srcvars[n].template get_stride<3>() == dstvar.get_stride<3>());
       }
-      const ptrdiff_t nstride = dstvar.nstride;
+      const ptrdiff_t nstride = dstvar.get_stride<3>();
       const ptrdiff_t npoints = nstride * ncomps;
 
       CCTK_REAL *restrict const dstptr = dstvar.dataPtr();

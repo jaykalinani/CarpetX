@@ -149,6 +149,21 @@ CCTK_HOST inline void CalcDenseStateBand(
   amrex::Gpu::synchronize();
 }
 
+/** Fill a coarse temporal source band, including periodic-domain images. */
+CCTK_HOST inline void
+FillSourceBand(const CarpetX::GHExt::PatchData::LevelData &leveldata,
+               amrex::MultiFab &band, const amrex::MultiFab &source) {
+  assert(band.ixType() == source.ixType());
+  assert(band.nComp() == source.nComp());
+  const auto &patchdata = CarpetX::ghext->patchdata.at(leveldata.patch);
+  const auto &geom = patchdata.amrcore->Geom(leveldata.level);
+
+  // Source-band boxes can extend beyond the domain when an interpolation
+  // stencil crosses a periodic seam. Copy valid data and its periodic images.
+  band.ParallelCopy(source, 0, 0, band.nComp(), amrex::IntVect{0},
+                    amrex::IntVect{0}, geom.periodicity());
+}
+
 /** Scatter a dense interpolation band only onto parent-prescribed points. */
 CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
     CarpetX::GHExt::PatchData::LevelData &leveldata,

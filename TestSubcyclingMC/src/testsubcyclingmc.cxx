@@ -224,6 +224,55 @@ extern "C" void TestSubcyclingMC_WarmCFMask(CCTK_ARGUMENTS) {
   });
 }
 
+namespace {
+
+struct source_band_check_t {
+  amrex::Long outside_domain;
+  amrex::Long value_errors;
+};
+
+source_band_check_t check_periodic_source_band(
+    const GHExt::PatchData::LevelData &leveldata, amrex::MultiFab &source_band,
+    amrex::MultiFab &source, const CCTK_REAL source_value) {
+  constexpr CCTK_REAL sentinel = -19;
+  source.setVal(source_value);
+  source_band.setVal(sentinel);
+  Subcycling::FillSourceBand(leveldata, source_band, source);
+  amrex::Gpu::synchronize();
+
+  enum check_t { outside_domain, value_errors, num_checks };
+  amrex::iMultiFab checks(source_band.boxArray(), source_band.DistributionMap(),
+                          num_checks, 0);
+  checks.setVal(0);
+
+  const auto &patchdata = ghext->patchdata.at(leveldata.patch);
+  const auto &geom = patchdata.amrcore->Geom(leveldata.level);
+  const amrex::Box domain = amrex::convert(geom.Domain(), source_band.ixType());
+  const auto domain_lo = amrex::lbound(domain);
+  const auto domain_hi = amrex::ubound(domain);
+
+  for (amrex::MFIter mfi(checks); mfi.isValid(); ++mfi) {
+    const auto source_arr = source_band.const_array(mfi);
+    const auto check_arr = checks.array(mfi);
+    amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE(int i, int j,
+                                                            int k) noexcept {
+      const bool outside = i < domain_lo.x || i > domain_hi.x ||
+                           j < domain_lo.y || j > domain_hi.y ||
+                           k < domain_lo.z || k > domain_hi.z;
+      check_arr(i, j, k, outside_domain) = outside;
+      check_arr(i, j, k, value_errors) = source_arr(i, j, k) != source_value;
+    });
+  }
+  amrex::Gpu::synchronize();
+
+  const auto &checks_base =
+      static_cast<const amrex::FabArray<amrex::IArrayBox> &>(checks);
+  return {checks_base.sum(outside_domain, amrex::IntVect{0}),
+          checks_base.sum(value_errors, amrex::IntVect{0})};
+}
+
+} // namespace
+
 extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
   if (!ghext->use_subcycling || ghext->num_levels() < 2)
     return;
@@ -271,6 +320,25 @@ extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
       if (untagged_source->boxArray() == tagged_source->boxArray())
         CCTK_VERROR(
             "Subcycling source-band geometry was shared across DDF1 and DDF5");
+
+      // The refined box is placed so the DDF5 coarse interpolation stencil
+      // crosses the lower-x periodic seam. Exercise the same source-band fill
+      // helper used by ODESolvers, while also checking the DDF1 control band.
+      constexpr CCTK_REAL untagged_source_value = 13;
+      constexpr CCTK_REAL tagged_source_value = 17;
+      const auto untagged_source_check = check_periodic_source_band(
+          leveldata, *untagged.ks_source_band.at(0), *untagged.mfab.at(0),
+          untagged_source_value);
+      const auto tagged_source_check =
+          check_periodic_source_band(leveldata, *tagged.ks_source_band.at(0),
+                                     *tagged.mfab.at(0), tagged_source_value);
+      if (tagged_source_check.outside_domain == 0)
+        CCTK_VERROR(
+            "DDF5 ownership test did not cross the periodic source seam");
+      if (untagged_source_check.value_errors != 0 ||
+          tagged_source_check.value_errors != 0)
+        CCTK_VERROR(
+            "Periodic coarse source-band fill left missing or incorrect data");
       return;
     }
 

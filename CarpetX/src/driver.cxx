@@ -1111,7 +1111,6 @@ void GHExt::PatchData::LevelData::build_bands(
     return;
 
   const std::array<int, dim> &indextype = groupdata.indextype;
-  const int s = (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
 
   const auto &patchdata = ghext->patchdata.at(patch);
   const amrex::IntVect ratio{2, 2, 2};
@@ -1122,22 +1121,27 @@ void GHExt::PatchData::LevelData::build_bands(
   // Current child (level+1) layout the source band must match; empty on the
   // finest level.
   amrex::BoxArray current_child_ba;
+  amrex::DistributionMapping current_child_dm;
   if (level + 1 < int(patchdata.leveldata.size())) {
     const auto &childleveldata = patchdata.leveldata.at(level + 1);
     const auto &childgroupdata =
         *childleveldata.groupdata.at(groupdata.groupindex);
     current_child_ba = childgroupdata.mfab.at(0)->boxArray();
+    current_child_dm = childgroupdata.mfab.at(0)->DistributionMap();
   }
 
-  // ---- Band geometry, built once per (level, centering), and rebuilt when
-  // the child layout changes (operator== short-circuits on the shared m_ref,
-  // so this is O(1) on unchanged grids). ----
-  // A non-null source_band_ba[s] marks the geometry as built; the consumer and
+  // ---- Group-specific band geometry, rebuilt when a child-only regrid or
+  // load-balance operation changes the child layout. ----
+  // A non-null source_band_ba marks the geometry as built; the consumer and
   // source slots are filled together, each possibly holding an empty BoxArray
   // (level 0 has no consumer band, the finest level has no source band). This
   // must run after all levels exist so the source band can see its children.
-  if (!source_band_ba[s] || !source_band_child_ba[s] ||
-      *source_band_child_ba[s] != current_child_ba) {
+  if (!groupdata.source_band_ba || !groupdata.source_band_dm ||
+      !groupdata.consumer_band_ba || !groupdata.consumer_band_dm ||
+      !groupdata.source_band_child_ba ||
+      !groupdata.source_band_child_dm ||
+      *groupdata.source_band_child_ba != current_child_ba ||
+      !(*groupdata.source_band_child_dm == current_child_dm)) {
     // Consumer band == this level's common boundary superset with respect to
     // the parent. Empty at level 0; the policy mask selects scatter targets.
     amrex::BoxArray fba;
@@ -1159,8 +1163,9 @@ void GHExt::PatchData::LevelData::build_bands(
       fba = amrex::convert(fpc.ba_fine_patch, mfab.ixType());
       fdm = fpc.dm_patch;
     }
-    consumer_band_ba[s] = std::make_unique<amrex::BoxArray>(fba);
-    consumer_band_dm[s] = std::make_unique<amrex::DistributionMapping>(fdm);
+    groupdata.consumer_band_ba = std::make_unique<amrex::BoxArray>(fba);
+    groupdata.consumer_band_dm =
+        std::make_unique<amrex::DistributionMapping>(fdm);
 
     // Source band == coarse cells under the next-finer level's cf-ghost
     // footprint (child fpc.ba_crse_patch). Empty when this is the finest level.
@@ -1187,42 +1192,50 @@ void GHExt::PatchData::LevelData::build_bands(
       cba = amrex::convert(fpc.ba_crse_patch, childmfab.ixType());
       cdm = fpc.dm_patch;
     }
-    source_band_ba[s] = std::make_unique<amrex::BoxArray>(cba);
-    source_band_dm[s] = std::make_unique<amrex::DistributionMapping>(cdm);
-    source_band_child_ba[s] =
+    groupdata.source_band_ba = std::make_unique<amrex::BoxArray>(cba);
+    groupdata.source_band_dm =
+        std::make_unique<amrex::DistributionMapping>(cdm);
+    groupdata.source_band_child_ba =
         std::make_unique<amrex::BoxArray>(current_child_ba);
+    groupdata.source_band_child_dm =
+        std::make_unique<amrex::DistributionMapping>(current_child_dm);
   }
 
   // ---- Per-group band MultiFab allocation (idempotent, zero ghost) ----
   const int numvars = groupdata.numvars;
-  for (int stage = 0; stage < ghext->num_rk_stages; ++stage) {
-    if (!groupdata.ks_consumer_band[stage] && !consumer_band_ba[s]->empty())
-      groupdata.ks_consumer_band[stage] = std::make_unique<amrex::MultiFab>(
-          *consumer_band_ba[s], *consumer_band_dm[s], numvars, 0);
-    // Drop a source band whose layout no longer matches the (rebuilt or
-    // emptied) geometry, then (re)allocate below.
-    if (groupdata.ks_source_band[stage] &&
-        groupdata.ks_source_band[stage]->boxArray() != *source_band_ba[s])
-      groupdata.ks_source_band[stage].reset();
-    if (!groupdata.ks_source_band[stage] && !source_band_ba[s]->empty())
-      groupdata.ks_source_band[stage] = std::make_unique<amrex::MultiFab>(
-          *source_band_ba[s], *source_band_dm[s], numvars, 0);
+  const auto ensure_band =
+      [numvars](std::unique_ptr<amrex::MultiFab> &band,
+                const amrex::BoxArray &ba,
+                const amrex::DistributionMapping &dm, const bool active) {
+        if (!active || ba.empty()) {
+          band.reset();
+          return;
+        }
+        if (band && (band->boxArray() != ba ||
+                     !(band->DistributionMap() == dm) ||
+                     band->nComp() != numvars ||
+                     band->nGrowVect() != amrex::IntVect{0}))
+          band.reset();
+        if (!band)
+          band = std::make_unique<amrex::MultiFab>(ba, dm, numvars, 0);
+      };
+
+  for (int stage = 0; stage < max_num_rk_stages; ++stage) {
+    const bool active = stage < ghext->num_rk_stages;
+    ensure_band(groupdata.ks_consumer_band[stage],
+                *groupdata.consumer_band_ba, *groupdata.consumer_band_dm,
+                active);
+    ensure_band(groupdata.ks_source_band[stage], *groupdata.source_band_ba,
+                *groupdata.source_band_dm, active);
   }
 
-  // Old-state bands (single snapshot, share the ks band geometry above).
-  if (!groupdata.old_consumer_band && !consumer_band_ba[s]->empty())
-    groupdata.old_consumer_band = std::make_unique<amrex::MultiFab>(
-        *consumer_band_ba[s], *consumer_band_dm[s], numvars, 0);
-  if (groupdata.old_source_band &&
-      groupdata.old_source_band->boxArray() != *source_band_ba[s])
-    groupdata.old_source_band.reset();
-  if (!groupdata.old_source_band && !source_band_ba[s]->empty())
-    groupdata.old_source_band = std::make_unique<amrex::MultiFab>(
-        *source_band_ba[s], *source_band_dm[s], numvars, 0);
-
-  if (!groupdata.dense_consumer_band && !consumer_band_ba[s]->empty())
-    groupdata.dense_consumer_band = std::make_unique<amrex::MultiFab>(
-        *consumer_band_ba[s], *consumer_band_dm[s], numvars, 0);
+  // Old-state and completed dense-state bands share the geometry above.
+  ensure_band(groupdata.old_consumer_band, *groupdata.consumer_band_ba,
+              *groupdata.consumer_band_dm, true);
+  ensure_band(groupdata.old_source_band, *groupdata.source_band_ba,
+              *groupdata.source_band_dm, true);
+  ensure_band(groupdata.dense_consumer_band, *groupdata.consumer_band_ba,
+              *groupdata.consumer_band_dm, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

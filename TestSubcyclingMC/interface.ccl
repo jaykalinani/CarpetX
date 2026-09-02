@@ -15,15 +15,25 @@ CCTK_REAL ustate TYPE=gf CENTERING={vvv} TAGS='dependents="uerror"'
   rho
 } "Scalar wave state vector"
 
-CCTK_REAL cf_ownership_untagged TYPE=gf CENTERING={cvv} TAGS='checkpoint="no" evolve="yes" restrict="no"'
+CCTK_REAL cf_ownership_untagged TYPE=gf CENTERING={cvv} TAGS='checkpoint="no" evolve="yes" restrict="no" rhs="cf_ownership_untagged_rhs" prolongation_type="ddf" prolongation_order=1'
 {
   cf_untagged
 } "Untagged coarse-fine ownership test field"
 
-CCTK_REAL cf_ownership_tagged TYPE=gf CENTERING={cvv} TAGS='checkpoint="no" evolve="yes" restrict="no" subcycling_prescribe_valid_cf_interface="yes"'
+CCTK_REAL cf_ownership_tagged TYPE=gf CENTERING={cvv} TAGS='checkpoint="no" evolve="yes" restrict="no" rhs="cf_ownership_tagged_rhs" prolongation_type="ddf" prolongation_order=5 subcycling_prescribe_valid_cf_interface="yes"'
 {
   cf_tagged
 } "Tagged coarse-fine ownership test field"
+
+CCTK_REAL cf_ownership_untagged_rhs TYPE=gf CENTERING={cvv} TAGS='checkpoint="no"'
+{
+  cf_untagged_rhs
+} "RHS for the untagged coarse-fine ownership test field"
+
+CCTK_REAL cf_ownership_tagged_rhs TYPE=gf CENTERING={cvv} TAGS='checkpoint="no"'
+{
+  cf_tagged_rhs
+} "RHS for the tagged coarse-fine ownership test field"
 
 CCTK_REAL pstate TYPE=gf TAGS='checkpoint="yes" evolve="no" restrict="no"'
 {
@@ -69,6 +79,5 @@ CCTK_REAL error TYPE=gf TAGS='checkpoint="no"'
   u_err
   rho_err
 } "Error in scalar wave state vector"
-
 
 

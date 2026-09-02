@@ -591,6 +591,11 @@ struct GHExt {
   // in schedule.cxx. Indexed [patch][level]. Empty outside of recovery window.
   std::vector<std::vector<std::optional<rat64> > > recovered_level_iterations;
 
+  // Coarse timestep recorded by a versioned asynchronous openPMD checkpoint.
+  // ODESolvers validates this after CarpetX has reconstructed the runtime
+  // timestep and before consuming the restored RK source history.
+  std::optional<CCTK_REAL> recovered_subcycling_delta_time;
+
   int num_patches() const { return patchdata.size(); }
   int num_levels(const int patch) const {
     return patchdata.at(patch).leveldata.size();

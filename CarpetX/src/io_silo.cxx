@@ -429,6 +429,8 @@ void InputSiloGridStructure(cGH *restrict const cctkGH,
   MPI_Bcast(nlevels.data(), npatches, MPI_INT, metafile_ioproc, mpi_comm);
 
   ghext->recovered_level_iterations.resize(ghext->num_patches());
+  int total_levels = 0;
+  int levels_with_iteration = 0;
 
   // Read FabArrayBase (component positions and shapes)
   for (int patch = 0; patch < npatches; ++patch) {
@@ -437,6 +439,7 @@ void InputSiloGridStructure(cGH *restrict const cctkGH,
     CCTK_VINFO("  Found %d levels on patch %d", nlevels.at(patch), patch);
     auto &patchdata = ghext->patchdata.at(patch);
     patchdata.amrcore->SetFinestLevel(nlevels.at(patch) - 1);
+    total_levels += nlevels.at(patch);
     ghext->recovered_level_iterations.at(patch).resize(nlevels.at(patch));
 
     for (int level = 0; level < nlevels.at(patch); ++level) {
@@ -503,29 +506,62 @@ void InputSiloGridStructure(cGH *restrict const cctkGH,
                               ".rl" + std::to_string(level));
 
         long long iter_num = 0, iter_den = 0;
-        bool have_iteration = false;
+        bool have_iter_num = false, have_iter_den = false;
         if (read_metafile) {
-          if (DBInqVarExists(metafile.get(), varname_num.c_str()) &&
-              DBInqVarExists(metafile.get(), varname_den.c_str())) {
+          have_iter_num =
+              DBInqVarExists(metafile.get(), varname_num.c_str());
+          have_iter_den =
+              DBInqVarExists(metafile.get(), varname_den.c_str());
+          if (have_iter_num && have_iter_den) {
             int ierr;
             ierr = DBReadVar(metafile.get(), varname_num.c_str(), &iter_num);
             assert(!ierr);
             ierr = DBReadVar(metafile.get(), varname_den.c_str(), &iter_den);
             assert(!ierr);
-            have_iteration = true;
           }
         }
-        MPI_Bcast(&have_iteration, 1, MPI_C_BOOL, metafile_ioproc, mpi_comm);
-        if (have_iteration) {
+        MPI_Bcast(&have_iter_num, 1, MPI_C_BOOL, metafile_ioproc, mpi_comm);
+        MPI_Bcast(&have_iter_den, 1, MPI_C_BOOL, metafile_ioproc, mpi_comm);
+        if (have_iter_num != have_iter_den)
+          CCTK_VERROR(
+              "Silo checkpoint has partial per-level iteration metadata for "
+              "patch %d level %d (numerator present: %s, denominator present: "
+              "%s)",
+              patch, level, have_iter_num ? "yes" : "no",
+              have_iter_den ? "yes" : "no");
+        if (have_iter_num) {
           MPI_Bcast(&iter_num, 1, MPI_LONG_LONG, metafile_ioproc, mpi_comm);
           MPI_Bcast(&iter_den, 1, MPI_LONG_LONG, metafile_ioproc, mpi_comm);
+          if (iter_den <= 0)
+            CCTK_VERROR(
+                "Silo checkpoint has invalid per-level iteration denominator "
+                "%lld for patch %d level %d",
+                iter_den, patch, level);
           ghext->recovered_level_iterations.at(patch).at(level) =
               rat64(iter_num, iter_den);
+          ++levels_with_iteration;
         }
         // else: old checkpoint without per-level iteration — leave as nullopt
       }
     } // for level
   } // for patch
+
+
+  if (levels_with_iteration != 0 && levels_with_iteration != total_levels)
+    CCTK_VERROR(
+        "Silo checkpoint has per-level iteration metadata for only %d of %d "
+        "levels; refusing an ambiguous partial recovery",
+        levels_with_iteration, total_levels);
+  const int legacy_iteration_ratio = 1 << (ghext->num_levels() - 1);
+  if (ghext->use_subcycling && total_levels > ghext->num_patches() &&
+      levels_with_iteration == 0 &&
+      cctkGH->cctk_iteration % legacy_iteration_ratio != 0)
+    CCTK_VERROR(
+        "Cannot safely recover legacy multi-level Silo subcycling checkpoint "
+        "at iteration %d without per-level iteration metadata: the iteration "
+        "is not divisible by the finest-level ratio %d and is therefore "
+        "asynchronous.",
+        cctkGH->cctk_iteration, legacy_iteration_ratio);
 
   interval_meta = nullptr;
 }

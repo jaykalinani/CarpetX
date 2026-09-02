@@ -490,6 +490,27 @@ extern "C" void ODESolvers_Solve_Subcycling_Recovery(CCTK_ARGUMENTS) {
   if (cctk_iteration <= 0)
     return;
 
+  bool asynchronous = false;
+  for (const auto &patchdata : ghext->patchdata)
+    for (const auto &leveldata : patchdata.leveldata)
+      if (leveldata.level > 0 &&
+          leveldata.iteration !=
+              patchdata.leveldata.at(leveldata.level - 1).iteration)
+        asynchronous = true;
+  if (asynchronous) {
+    if (!ghext->recovered_subcycling_delta_time)
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling RK history without its "
+          "checkpointed coarse timestep");
+    if (*ghext->recovered_subcycling_delta_time != cctk_delta_time)
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling RK history: checkpoint "
+          "coarse timestep %.17g differs from runtime timestep %.17g",
+          double(*ghext->recovered_subcycling_delta_time),
+          double(cctk_delta_time));
+  }
+  ghext->recovered_subcycling_delta_time.reset();
+
   if (verbose)
     CCTK_VINFO("Subcycling recovery: refilling refinement-boundary ghosts "
                "(spatial prolongation on time-aligned levels, dense output "

@@ -54,6 +54,7 @@ static inline int omp_in_parallel() { return 0; }
 #include <mutex>
 #include <optional>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -265,6 +266,18 @@ std::string UnitDimension_string(const std::array<double, 7> &unitDimension) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct carpetx_openpmd_t {
+  static constexpr std::int64_t subcycling_band_schema_version = 2;
+  static constexpr const char *subcycling_schema_attr =
+      "carpetxSubcyclingBandSchemaVersion";
+  static constexpr const char *subcycling_manifest_attr =
+      "carpetxSubcyclingBandManifest";
+  static constexpr const char *subcycling_method_attr =
+      "carpetxSubcyclingIntegrator";
+  static constexpr const char *subcycling_stages_attr =
+      "carpetxSubcyclingIntegratorStages";
+  static constexpr const char *subcycling_dt_attr =
+      "carpetxSubcyclingCoarseDeltaTime";
+
   carpetx_openpmd_t() = default;
 
   carpetx_openpmd_t(const carpetx_openpmd_t &) = delete;
@@ -417,6 +430,62 @@ struct carpetx_openpmd_t {
     for (auto &ch : varname)
       ch = std::tolower(ch);
     return varname;
+  }
+
+  static std::string ode_method() {
+    const void *const value =
+        CCTK_ParameterGet("method", "ODESolvers", nullptr);
+    if (!value)
+      CCTK_VERROR(
+          "Cannot describe an asynchronous subcycling checkpoint because "
+          "ODESolvers::method is unavailable");
+    return *static_cast<const char *const *>(value);
+  }
+
+  static std::vector<std::string>
+  make_subcycling_band_manifest(const std::vector<bool> &group_mask) {
+    std::vector<std::string> manifest;
+    const auto add_band = [&](const int gi, const auto &leveldata,
+                              const amrex::MultiFab *const band,
+                              const band_kind kind, const int stage) {
+      if (band && !band->empty())
+        manifest.push_back(make_meshname(
+            gi, leveldata.patch, leveldata.level, 0,
+            subcycling_band_tag(kind, stage)));
+    };
+    for (const auto &patchdata : ghext->patchdata)
+      for (const auto &leveldata : patchdata.leveldata)
+        for (int gi = 0; gi < CCTK_NumGroups(); ++gi) {
+          if (!group_mask.at(gi) || CCTK_GroupTypeI(gi) != CCTK_GF)
+            continue;
+          const auto *const groupdata = leveldata.groupdata.at(gi).get();
+          if (!groupdata || groupdata->mfab.empty())
+            continue;
+          for (int s = 0; s < max_num_rk_stages; ++s)
+            add_band(gi, leveldata, groupdata->ks_source_band[s].get(),
+                     band_kind::ks_source, s);
+          add_band(gi, leveldata, groupdata->old_source_band.get(),
+                   band_kind::old_source, -1);
+          add_band(gi, leveldata, groupdata->dense_consumer_band.get(),
+                   band_kind::accepted_consumer, -1);
+        }
+    return manifest;
+  }
+
+  static bool recovered_levels_synchronized() {
+    std::optional<rat64> reference;
+    for (const auto &patch_iterations : ghext->recovered_level_iterations)
+      for (const auto &iteration : patch_iterations) {
+        // Grid-structure input permits absent metadata only for a legacy
+        // checkpoint whose global iteration proves it is time-aligned.
+        if (!iteration)
+          continue;
+        if (!reference)
+          reference = *iteration;
+        else if (*iteration != *reference)
+          return false;
+      }
+    return true;
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -627,6 +696,8 @@ void carpetx_openpmd_t::InputOpenPMDGridStructure(cGH *cctkGH,
   }
 
   ghext->recovered_level_iterations.resize(ghext->num_patches());
+  int total_levels = 0;
+  int levels_with_iteration = 0;
 
   for (auto &patchdata : ghext->patchdata) {
     const int patch = patchdata.patch;
@@ -654,6 +725,7 @@ void carpetx_openpmd_t::InputOpenPMDGridStructure(cGH *cctkGH,
 
     assert(ndims == 3);
     assert(nlevels > 0);
+    total_levels += nlevels;
     patchdata.amrcore->SetFinestLevel(nlevels - 1);
     ghext->recovered_level_iterations.at(patch).resize(nlevels);
 
@@ -698,17 +770,46 @@ void carpetx_openpmd_t::InputOpenPMDGridStructure(cGH *cctkGH,
           "iteration_num" + level_suffixes.at(level);
       const std::string iter_den_attr =
           "iteration_den" + level_suffixes.at(level);
-      if (read_iter->containsAttribute(iter_num_attr) &&
-          read_iter->containsAttribute(iter_den_attr)) {
+      const bool have_iter_num = read_iter->containsAttribute(iter_num_attr);
+      const bool have_iter_den = read_iter->containsAttribute(iter_den_attr);
+      if (have_iter_num != have_iter_den)
+        CCTK_VERROR(
+            "Checkpoint has partial per-level iteration metadata for patch "
+            "%d level %d (numerator present: %s, denominator present: %s)",
+            patch, level, have_iter_num ? "yes" : "no",
+            have_iter_den ? "yes" : "no");
+      if (have_iter_num) {
         const auto num =
             read_iter->getAttribute(iter_num_attr).get<std::int64_t>();
         const auto den =
             read_iter->getAttribute(iter_den_attr).get<std::int64_t>();
+        if (den <= 0)
+          CCTK_VERROR(
+              "Checkpoint has invalid per-level iteration denominator %lld "
+              "for patch %d level %d",
+              static_cast<long long>(den), patch, level);
         ghext->recovered_level_iterations.at(patch).at(level) = rat64(num, den);
+        ++levels_with_iteration;
       }
       // else: old checkpoint without per-level iteration — leave as nullopt
     } // for level
   } // for patch
+
+  if (levels_with_iteration != 0 && levels_with_iteration != total_levels)
+    CCTK_VERROR(
+        "Checkpoint has per-level iteration metadata for only %d of %d "
+        "levels; refusing an ambiguous partial recovery",
+        levels_with_iteration, total_levels);
+  const int legacy_iteration_ratio = 1 << (ghext->num_levels() - 1);
+  if (ghext->use_subcycling && total_levels > ghext->num_patches() &&
+      levels_with_iteration == 0 &&
+      cctkGH->cctk_iteration % legacy_iteration_ratio != 0)
+    CCTK_VERROR(
+        "Cannot safely recover legacy multi-level subcycling checkpoint at "
+        "iteration %d without per-level iteration metadata: the iteration is "
+        "not divisible by the finest-level ratio %d and is therefore "
+        "asynchronous.",
+        cctkGH->cctk_iteration, legacy_iteration_ratio);
 }
 
 void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
@@ -776,6 +877,109 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
 
   openPMD::Container<openPMD::Mesh> &meshes = read_iter->meshes;
   CCTK_VINFO("  found %d meshes", int(meshes.size()));
+
+  if (tl_mode == TimeLevelMode::All) {
+    // An in-flight RK epoch is meaningful only as one complete, versioned
+    // object. Never infer it from whichever band meshes happen to be present:
+    // that would permit a truncated file or an older consumer-first format to
+    // be interpreted as the source-first D1 state. Ordinary analysis input
+    // reads only Current and deliberately has no restart-schema contract.
+    ghext->recovered_subcycling_delta_time.reset();
+    const bool asynchronous =
+        ghext->use_subcycling && !recovered_levels_synchronized();
+    const std::array<const char *, 5> schema_attributes{
+        subcycling_schema_attr, subcycling_manifest_attr,
+        subcycling_method_attr, subcycling_stages_attr, subcycling_dt_attr};
+    int present_schema_attributes = 0;
+    for (const char *const attribute : schema_attributes)
+      present_schema_attributes += read_iter->containsAttribute(attribute);
+    if (present_schema_attributes != 0 &&
+        present_schema_attributes != int(schema_attributes.size()))
+      CCTK_VERROR(
+          "Cannot recover a partial asynchronous subcycling checkpoint "
+          "schema: found %d of %d required iteration attributes",
+          present_schema_attributes, int(schema_attributes.size()));
+    const bool have_subcycling_schema = present_schema_attributes != 0;
+    if (asynchronous && !have_subcycling_schema)
+      CCTK_VERROR(
+          "Cannot recover an asynchronous legacy subcycling checkpoint: the "
+          "versioned source-history/accepted-boundary manifest is absent. "
+          "Restart from a time-aligned checkpoint or regenerate it with the "
+          "current openPMD format.");
+    if (!asynchronous && have_subcycling_schema)
+      CCTK_VERROR(
+          "Checkpoint declares an asynchronous subcycling band schema, but "
+          "its per-level iteration metadata is time-aligned");
+
+    if (have_subcycling_schema) {
+    const auto &schema = read_iter->getAttribute(subcycling_schema_attr);
+    const auto &manifest_attr =
+        read_iter->getAttribute(subcycling_manifest_attr);
+    const auto &method_attr = read_iter->getAttribute(subcycling_method_attr);
+    const auto &stages_attr = read_iter->getAttribute(subcycling_stages_attr);
+    const auto &dt_attr = read_iter->getAttribute(subcycling_dt_attr);
+    if (schema.dtype != openPMD::Datatype::INT64 ||
+        manifest_attr.dtype != openPMD::Datatype::VEC_STRING ||
+        method_attr.dtype != openPMD::Datatype::STRING ||
+        stages_attr.dtype != openPMD::Datatype::INT64 ||
+        dt_attr.dtype != openPMD::Datatype::DOUBLE)
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling checkpoint: the v2 "
+          "schema attributes have incompatible datatypes");
+
+    const std::int64_t version = schema.get<std::int64_t>();
+    if (version != subcycling_band_schema_version)
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling checkpoint schema version "
+          "%lld (this executable requires version %lld)",
+          static_cast<long long>(version),
+          static_cast<long long>(subcycling_band_schema_version));
+
+    const std::string checkpoint_method = method_attr.get<std::string>();
+    const std::string current_method = ode_method();
+    const std::int64_t checkpoint_stages = stages_attr.get<std::int64_t>();
+    if (checkpoint_method != current_method ||
+        checkpoint_stages != ghext->num_rk_stages)
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling RK history written by "
+          "%s with %lld stages using %s with %d stages",
+          checkpoint_method.c_str(),
+          static_cast<long long>(checkpoint_stages), current_method.c_str(),
+          ghext->num_rk_stages);
+
+    const double checkpoint_dt = dt_attr.get<double>();
+    if (checkpoint_dt != read_iter->dt<double>())
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling checkpoint: its RK-history "
+          "coarse timestep disagrees with the openPMD iteration timestep");
+    ghext->recovered_subcycling_delta_time = checkpoint_dt;
+
+    const std::vector<std::string> manifest =
+        manifest_attr.get<std::vector<std::string> >();
+    const std::set<std::string> stored_manifest(manifest.begin(),
+                                                manifest.end());
+    if (manifest.empty() || stored_manifest.size() != manifest.size())
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling checkpoint: its band "
+          "manifest is empty or contains duplicate mesh names");
+    const std::vector<std::string> expected =
+        make_subcycling_band_manifest(input_group);
+    const std::set<std::string> expected_manifest(expected.begin(),
+                                                  expected.end());
+    if (stored_manifest != expected_manifest)
+      CCTK_VERROR(
+          "Cannot recover asynchronous subcycling checkpoint: band manifest "
+          "does not match the %d meshes required by the rebuilt hierarchy "
+          "and evolved checkpoint groups (file declares %d)",
+          int(expected_manifest.size()), int(stored_manifest.size()));
+    for (const std::string &meshname : stored_manifest)
+      if (!meshes.count(meshname))
+        CCTK_VERROR(
+            "Cannot recover asynchronous subcycling checkpoint: manifested "
+            "band mesh %s is absent",
+            meshname.c_str());
+    }
+  } // if recovery/checkpoint input
 
   if (io_verbose) {
     for (auto mesh_iter = meshes.begin(); mesh_iter != meshes.end();
@@ -1109,7 +1313,7 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
           // Subcycling source history and accepted boundary snapshot (see
           // OutputOpenPMD). Guard on mesh existence so synchronized and legacy
           // checkpoints leave the rebuilt bands explicitly marked unrestored.
-          {
+          if (tl_mode == TimeLevelMode::All) {
             const auto read_band = [&](amrex::MultiFab *const band,
                                        const band_kind kind,
                                        const int stage) -> bool {
@@ -1590,7 +1794,31 @@ void carpetx_openpmd_t::OutputOpenPMD(const cGH *const cctkGH,
   // At an unsynchronized subcycling checkpoint the fine consumer bands hold
   // mid-cycle state that exists nowhere else and must be serialized. Otherwise
   // the on-disk format is unchanged.
-  const bool write_bands = !all_levels_synchronized();
+  const bool write_bands =
+      tl_mode == TimeLevelMode::All && !all_levels_synchronized();
+
+  if (write_bands && !slice) {
+    const std::vector<std::string> manifest =
+        make_subcycling_band_manifest(output_group);
+    if (manifest.empty())
+      CCTK_VERROR(
+          "Cannot write an asynchronous subcycling checkpoint without any "
+          "source-history or accepted-boundary band meshes");
+    const std::set<std::string> unique_manifest(manifest.begin(),
+                                                manifest.end());
+    if (unique_manifest.size() != manifest.size())
+      CCTK_VERROR(
+          "Internal error: asynchronous subcycling checkpoint manifest "
+          "contains duplicate mesh names");
+    write_iter.setAttribute<std::int64_t>(
+        subcycling_schema_attr, subcycling_band_schema_version);
+    write_iter.setAttribute(subcycling_manifest_attr, manifest);
+    write_iter.setAttribute(subcycling_method_attr, ode_method());
+    write_iter.setAttribute<std::int64_t>(subcycling_stages_attr,
+                                          ghext->num_rk_stages);
+    write_iter.setAttribute<double>(subcycling_dt_attr,
+                                    cctk_delta_time);
+  }
 
   // Iteration attributes are set on EVERY rank (all inputs are replicated):
   // rank-asymmetric writes deadlock the HDF5 backend's collective metadata.

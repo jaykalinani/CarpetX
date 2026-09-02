@@ -27,6 +27,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <algorithm>
+#include <optional>
 #include <regex>
 #include <utility>
 #include <vector>
@@ -101,6 +102,23 @@ void check_silo_no_multi_tl(const std::vector<bool> &group_mask,
                   "Use \"openpmd\" instead.",
                   operation, CCTK_FullGroupName(gi), gd->mfab.size());
   }
+}
+
+bool recovered_levels_are_synchronized() {
+  std::optional<rat64> reference;
+  for (const auto &patch_iterations : ghext->recovered_level_iterations)
+    for (const auto &iteration : patch_iterations) {
+      // Grid-structure input rejects partial/missing metadata for multi-level
+      // subcycling. A missing value can remain only in a legacy case where no
+      // asynchronous state is representable.
+      if (!iteration)
+        continue;
+      if (!reference)
+        reference = *iteration;
+      else if (*iteration != *reference)
+        return false;
+    }
+  return true;
 }
 } // namespace
 
@@ -249,6 +267,12 @@ void RecoverGH(const cGH *restrict cctkGH) {
   } else if (CCTK_EQUALS(recover_method, "silo")) {
 
 #ifdef HAVE_CAPABILITY_Silo
+    if (ghext->use_subcycling && !recovered_levels_are_synchronized())
+      CCTK_VERROR(
+          "Exact asynchronous subcycling recovery is currently supported "
+          "only with CarpetX::recover_method=\"openpmd\". Silo's band I/O "
+          "does not yet support every staggered edge/face centering; refusing "
+          "to recover an in-flight RK epoch rather than misinterpret it.");
     check_silo_no_multi_tl(group_enabled, "recovery");
     InputSilo(cctkGH, group_enabled, recover_dir, recover_file);
 #else
@@ -765,6 +789,12 @@ void Checkpoint(const cGH *const restrict cctkGH) {
   } else if (CCTK_EQUALS(checkpoint_method, "silo")) {
 
 #ifdef HAVE_CAPABILITY_Silo
+    if (!all_levels_synchronized())
+      CCTK_VERROR(
+          "Exact asynchronous subcycling checkpoints are currently supported "
+          "only with CarpetX::checkpoint_method=\"openpmd\". Silo's band "
+          "I/O does not yet support every staggered edge/face centering; "
+          "refusing to write an incomplete in-flight RK epoch.");
     const std::vector<bool> checkpoint_group = [&] {
       std::vector<bool> enabled(CCTK_NumGroups(), false);
       for (int gi = 0; gi < CCTK_NumGroups(); ++gi) {

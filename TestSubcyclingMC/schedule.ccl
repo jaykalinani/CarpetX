@@ -1,6 +1,6 @@
 # Schedule definitions for thorn TestSubcyclingMC
 
-STORAGE: ustate pstate k1 k2 k3 k4 error
+STORAGE: ustate pstate k1 k2 k3 k4 error cf_ownership_untagged cf_ownership_tagged
 
 
 SCHEDULE TestSubcyclingMC_Initial AT initial
@@ -9,6 +9,14 @@ SCHEDULE TestSubcyclingMC_Initial AT initial
   WRITES: ustate(interior)
   SYNC: ustate
 } "Initialize scalar wave state"
+
+if (test_cf_ownership) {
+  SCHEDULE TestSubcyclingMC_TestCFOwnership AT postinitial
+  {
+    LANG: C
+    OPTIONS: global
+  } "Verify tagged staggered dense-band ownership at refinement boundaries"
+}
 
 SCHEDULE TestSubcyclingMC_Sync AT postregrid
 {

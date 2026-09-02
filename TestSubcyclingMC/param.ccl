@@ -31,6 +31,10 @@ CCTK_REAL gaussian_width "width of Gaussian"
   (0:* :: ""
 } 1.0
 
+BOOLEAN test_cf_ownership "Test staggered coarse-fine ownership policy"
+{
+} "no"
+
 
 SHARES: Driver
 

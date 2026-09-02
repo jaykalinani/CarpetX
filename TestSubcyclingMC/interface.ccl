@@ -3,6 +3,7 @@
 IMPLEMENTS: TestSubcyclingMC
 
 USES INCLUDE HEADER: loop_device.hxx
+USES INCLUDE HEADER: subcycling.hxx
 USES INCLUDE HEADER: subcycling_legacy.hxx
 USES INCLUDE HEADER: vect.hxx
 
@@ -13,6 +14,16 @@ CCTK_REAL ustate TYPE=gf CENTERING={vvv} TAGS='dependents="uerror"'
   u
   rho
 } "Scalar wave state vector"
+
+CCTK_REAL cf_ownership_untagged TYPE=gf CENTERING={cvv} TAGS='checkpoint="no" evolve="yes" restrict="no"'
+{
+  cf_untagged
+} "Untagged coarse-fine ownership test field"
+
+CCTK_REAL cf_ownership_tagged TYPE=gf CENTERING={cvv} TAGS='checkpoint="no" evolve="yes" restrict="no" subcycling_prescribe_valid_cf_interface="yes"'
+{
+  cf_tagged
+} "Tagged coarse-fine ownership test field"
 
 CCTK_REAL pstate TYPE=gf TAGS='checkpoint="yes" evolve="no" restrict="no"'
 {

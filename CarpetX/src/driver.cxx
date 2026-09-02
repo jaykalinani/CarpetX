@@ -432,6 +432,19 @@ bool get_group_subcycling_prescribe_valid_cf_interface_flag(const int gi) {
   return false;
 }
 
+bool get_group_ode_rhs_flag(const int gi) {
+  const int tags = CCTK_GroupTagsTableI(gi);
+  assert(tags >= 0);
+  std::vector<char> rhs(1000);
+  const int iret = Util_TableGetString(tags, rhs.size(), rhs.data(), "rhs");
+  if (iret == UTIL_ERROR_TABLE_NO_SUCH_KEY)
+    return false;
+  if (iret >= 0)
+    return rhs.front() != '\0';
+  assert(0);
+  return false;
+}
+
 std::array<int, dim> get_group_indextype(const int gi) {
   DECLARE_CCTK_PARAMETERS;
 
@@ -906,6 +919,7 @@ GHExt::PatchData::LevelData::GroupData::GroupData(
   do_evolve = get_group_evolve_flag(gi);
   subcycling_prescribe_valid_cf_interface =
       get_group_subcycling_prescribe_valid_cf_interface_flag(gi);
+  has_ode_rhs = get_group_ode_rhs_flag(gi);
   do_restrict = get_group_restrict_flag(gi);
   indextype = get_group_indextype(gi);
   nghostzones = get_group_nghostzones(gi);
@@ -1090,8 +1104,10 @@ amrex::iMultiFab *GHExt::PatchData::LevelData::get_cf_mask(
 
 void GHExt::PatchData::LevelData::build_bands(
     const GroupData &groupdata) const {
-  // Bands only exist for evolved groups under subcycling.
-  if (!ghext->use_subcycling || !groupdata.do_evolve)
+  // Temporal bands exist only for groups integrated by ODESolvers. The
+  // broader do_evolve flag defaults to the checkpoint flag and includes
+  // persistent non-ODE state.
+  if (!ghext->use_subcycling || !groupdata.has_ode_rhs)
     return;
 
   const std::array<int, dim> &indextype = groupdata.indextype;

@@ -114,7 +114,6 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   auto &var = setup.var;
   auto &rhs = setup.rhs;
   auto &var_groups = setup.var_groups;
-  auto &rhs_groups = setup.rhs_groups;
   auto &dep_groups = setup.dep_groups;
   const int nvars = setup.nvars;
   if (verbose)
@@ -224,11 +223,15 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
           stage, double(cctkGH->cctk_time));
     const int s = stage - 1;
     active_levels->loop_coarse_to_fine([&](const auto &restrict leveldata) {
-      // rhs_groups[i] and var_groups[i] are paired by sort order.
-      for (size_t i = 0; i < rhs_groups.size(); ++i) {
-        const auto &rhs_groupdata = *leveldata.groupdata.at(rhs_groups[i]);
+      // Resolve each evolved group's declared RHS directly. The evolved and
+      // RHS lists are independently sorted for deterministic scheduling and
+      // invalidation; their positions are not a semantic pairing.
+      for (const int gi : var_groups) {
+        const int rhs_gi = get_group_rhs(gi);
+        assert(rhs_gi >= 0);
+        const auto &rhs_groupdata = *leveldata.groupdata.at(rhs_gi);
         // The k-stage bands live on the evolved group's GroupData.
-        const auto &groupdata = *leveldata.groupdata.at(var_groups[i]);
+        const auto &groupdata = *leveldata.groupdata.at(gi);
         // The finest level has no source band (no children to prolongate to).
         if (!groupdata.ks_source_band[s])
           continue;

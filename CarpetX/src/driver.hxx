@@ -171,6 +171,10 @@ struct GHExt {
     // to the parent-prescribed subcycling boundary for this group. Ordinary
     // coarse-fine ghosts are prescribed independently of this opt-in policy.
     bool subcycling_prescribe_valid_cf_interface = false;
+    // True only for a grid-function group with a nonempty ODESolvers `rhs`
+    // tag. `do_evolve` has broader checkpoint/timelevel semantics and must not
+    // select temporal subcycling bands.
+    bool has_ode_rhs = false;
     bool do_restrict;   // whether to restrict
 
     std::vector<std::vector<why_valid_t> > valid; // [time level][var index]

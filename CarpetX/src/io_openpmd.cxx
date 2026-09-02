@@ -918,10 +918,10 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
     const auto &method_attr = read_iter->getAttribute(subcycling_method_attr);
     const auto &stages_attr = read_iter->getAttribute(subcycling_stages_attr);
     const auto &dt_attr = read_iter->getAttribute(subcycling_dt_attr);
-    if (schema.dtype != openPMD::Datatype::INT64 ||
+    if (schema.dtype != openPMD::determineDatatype<std::int64_t>() ||
         manifest_attr.dtype != openPMD::Datatype::VEC_STRING ||
         method_attr.dtype != openPMD::Datatype::STRING ||
-        stages_attr.dtype != openPMD::Datatype::INT64 ||
+        stages_attr.dtype != openPMD::determineDatatype<std::int64_t>() ||
         dt_attr.dtype != openPMD::Datatype::DOUBLE)
       CCTK_VERROR(
           "Cannot recover asynchronous subcycling checkpoint: the v2 "

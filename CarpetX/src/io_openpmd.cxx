@@ -1127,13 +1127,35 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
 
               std::vector<openPMD::MeshRecordComponent> record_components;
               record_components.reserve(numvars);
-              openPMD::Extent extent;
+              const amrex::Box band_domain = band->boxArray().minimalBox();
+              const Arith::vect<int, 3> band_lo{
+                  band_domain.smallEnd(0), band_domain.smallEnd(1),
+                  band_domain.smallEnd(2)};
+              const openPMD::Extent expected_extent = to_vector(reversed(
+                  Arith::vect<int, 3>{band_domain.length(0),
+                                      band_domain.length(1),
+                                      band_domain.length(2)}));
+              if (int(mesh.size()) != numvars)
+                CCTK_VERROR(
+                    "Cannot recover subcycling band mesh %s: expected %d "
+                    "components, found %d",
+                    meshname.c_str(), numvars, int(mesh.size()));
               for (int vi = 0; vi < numvars; ++vi) {
                 const std::string componentname = make_componentname(gi, vi);
-                assert(mesh.count(componentname));
+                if (!mesh.count(componentname))
+                  CCTK_VERROR(
+                      "Cannot recover subcycling band mesh %s: required "
+                      "component %s is absent",
+                      meshname.c_str(), componentname.c_str());
                 record_components.push_back(mesh.at(componentname));
-                if (vi == 0)
-                  extent = record_components.back().getExtent();
+                const openPMD::Extent component_extent =
+                    record_components.back().getExtent();
+                if (component_extent != expected_extent)
+                  CCTK_VERROR(
+                      "Cannot recover subcycling band mesh %s component %s: "
+                      "checkpoint extent does not match the rebuilt band "
+                      "geometry",
+                      meshname.c_str(), componentname.c_str());
               }
               assert(int(record_components.size()) == numvars);
 
@@ -1151,12 +1173,13 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
                            fabbox.bigEnd(2) + 1}};
 
                 const openPMD::Offset start =
-                    to_vector(reversed(box.lo - idomain.lo));
+                    to_vector(reversed(box.lo - band_lo));
                 const openPMD::Extent count = to_vector(reversed(box.shape()));
                 const int np = box.size();
                 assert(int(count.at(0) * count.at(1) * count.at(2)) == np);
                 for (int d = 0; d < 3; ++d)
-                  assert(start.at(d) + count.at(d) <= extent.at(d));
+                  assert(start.at(d) + count.at(d) <=
+                         expected_extent.at(d));
 
                 amrex::FArrayBox &fab = (*band)[component];
                 for (int vi = 0; vi < numvars; ++vi) {
@@ -1948,10 +1971,17 @@ void carpetx_openpmd_t::OutputOpenPMD(const cGH *const cctkGH,
               mesh.setGeometry(openPMD::Mesh::Geometry::cartesian);
               mesh.setAxisLabels(
                   reversed(std::vector<std::string>{"x", "y", "z"}));
-              mesh.setGridSpacing(to_vector<CCTK_REAL>(reversed(
-                  fmap([](auto x, auto y) { return x / CCTK_REAL(y); },
-                       rdomain.hi - rdomain.lo, idomain.shape() - 1))));
-              mesh.setGridGlobalOffset(to_vector<double>(reversed(rdomain.lo)));
+              const amrex::Box band_domain = band->boxArray().minimalBox();
+              const Arith::vect<int, 3> band_lo{
+                  band_domain.smallEnd(0), band_domain.smallEnd(1),
+                  band_domain.smallEnd(2)};
+              const Arith::vect<CCTK_REAL, 3> band_dx{dx[0], dx[1], dx[2]};
+              const Arith::vect<double, 3> band_x0{
+                  xlo[0] + (band_lo[0] - ilo[0]) * dx[0],
+                  xlo[1] + (band_lo[1] - ilo[1]) * dx[1],
+                  xlo[2] + (band_lo[2] - ilo[2]) * dx[2]};
+              mesh.setGridSpacing(to_vector<CCTK_REAL>(reversed(band_dx)));
+              mesh.setGridGlobalOffset(to_vector<double>(reversed(band_x0)));
               mesh.setGridUnitSI(Unit::length);
               mesh.setTimeOffset(CCTK_REAL(0));
 
@@ -1968,8 +1998,13 @@ void carpetx_openpmd_t::OutputOpenPMD(const cGH *const cctkGH,
                     to_vector<double>(reversed(position)));
               }
               assert(int(record_components.size()) == numvars);
+              const openPMD::Extent band_extent = to_vector(reversed(
+                  Arith::vect<int, 3>{band_domain.length(0),
+                                      band_domain.length(1),
+                                      band_domain.length(2)}));
+              const openPMD::Dataset band_dataset(datatype, band_extent);
               for (int vi = 0; vi < numvars; ++vi)
-                record_components.at(vi).resetDataset(dataset);
+                record_components.at(vi).resetDataset(band_dataset);
 
               const int num_local_components = band->local_size();
               for (int local_component = 0;
@@ -1985,12 +2020,12 @@ void carpetx_openpmd_t::OutputOpenPMD(const cGH *const cctkGH,
                            fabbox.bigEnd(2) + 1}};
 
                 const openPMD::Offset start =
-                    to_vector(reversed(box.lo - idomain.lo));
+                    to_vector(reversed(box.lo - band_lo));
                 const openPMD::Extent count = to_vector(reversed(box.shape()));
                 const int np = box.size();
                 assert(int(count.at(0) * count.at(1) * count.at(2)) == np);
                 for (int d = 0; d < 3; ++d)
-                  assert(start.at(d) + count.at(d) <= extent.at(d));
+                  assert(start.at(d) + count.at(d) <= band_extent.at(d));
 
                 const amrex::FArrayBox &fab = (*band)[component];
                 for (int vi = 0; vi < numvars; ++vi) {

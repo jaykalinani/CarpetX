@@ -526,6 +526,12 @@ struct GHExt {
         mutable std::unique_ptr<amrex::MultiFab> old_source_band;
         mutable std::unique_ptr<amrex::MultiFab> old_consumer_band;
 
+        // The completed dense temporal state after its single spatial
+        // prolongation. This is separate from the constituent consumer bands
+        // so the forward evolution path never prolongates those constituents
+        // independently.
+        mutable std::unique_ptr<amrex::MultiFab> dense_consumer_band;
+
         // flux register between this and the next coarser level
         std::unique_ptr<amrex::FluxRegister> freg;
         // associated flux group indices

@@ -1219,6 +1219,10 @@ void GHExt::PatchData::LevelData::build_bands(
   if (!groupdata.old_source_band && !source_band_ba[s]->empty())
     groupdata.old_source_band = std::make_unique<amrex::MultiFab>(
         *source_band_ba[s], *source_band_dm[s], numvars, 0);
+
+  if (!groupdata.dense_consumer_band && !consumer_band_ba[s]->empty())
+    groupdata.dense_consumer_band = std::make_unique<amrex::MultiFab>(
+        *consumer_band_ba[s], *consumer_band_dm[s], numvars, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

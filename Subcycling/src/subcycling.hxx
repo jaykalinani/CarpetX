@@ -18,6 +18,137 @@
 
 namespace Subcycling {
 
+/** Coefficients of the RK dense state at one fine-grid stage. */
+template <int RKSTAGES>
+CCTK_HOST inline amrex::GpuArray<CCTK_REAL, RKSTAGES>
+DenseOutputCoefficients(const CCTK_REAL xsi, const CCTK_INT stage) {
+  static_assert(RKSTAGES == 3 || RKSTAGES == 4,
+                "DenseOutputCoefficients supports only RK3 or RK4");
+  assert(xsi >= 0.0 && xsi <= 1.0);
+  assert(stage > 0 && stage <= RKSTAGES);
+
+  constexpr CCTK_REAL r = 0.5;
+  const CCTK_REAL xsi2 = xsi * xsi;
+  amrex::GpuArray<CCTK_REAL, RKSTAGES> a{};
+
+  if constexpr (RKSTAGES == 3) {
+    // AMReX SSPRK3 dense output (AMReX_FillPatcher.H): degree two in time.
+    const amrex::GpuArray<CCTK_REAL, 3> b{
+        xsi - (5.0 / 6.0) * xsi2,
+        (1.0 / 6.0) * xsi2,
+        (2.0 / 3.0) * xsi2,
+    };
+    const amrex::GpuArray<CCTK_REAL, 3> bt{
+        1.0 - (5.0 / 3.0) * xsi,
+        (1.0 / 3.0) * xsi,
+        (4.0 / 3.0) * xsi,
+    };
+    constexpr amrex::GpuArray<CCTK_REAL, 3> btt{
+        -5.0 / 3.0,
+        1.0 / 3.0,
+        4.0 / 3.0,
+    };
+
+    for (int s = 0; s < RKSTAGES; ++s)
+      a[s] = b[s];
+    if (stage == 2) {
+      // SSPRK3 uses r*ut here (not 0.5*r*ut as RK4 stage two does).
+      for (int s = 0; s < RKSTAGES; ++s)
+        a[s] += r * bt[s];
+    } else if (stage == 3) {
+      const CCTK_REAL r2 = r * r;
+      for (int s = 0; s < RKSTAGES; ++s)
+        a[s] += 0.5 * r * bt[s] + 0.25 * r2 * btt[s];
+    }
+  } else {
+    const CCTK_REAL xsi3 = xsi2 * xsi;
+    const amrex::GpuArray<CCTK_REAL, 4> b{
+        xsi - 1.5 * xsi2 + (2.0 / 3.0) * xsi3,
+        xsi2 - (2.0 / 3.0) * xsi3,
+        xsi2 - (2.0 / 3.0) * xsi3,
+        -0.5 * xsi2 + (2.0 / 3.0) * xsi3,
+    };
+    const amrex::GpuArray<CCTK_REAL, 4> bt{
+        1.0 - 3.0 * xsi + 2.0 * xsi2,
+        2.0 * xsi - 2.0 * xsi2,
+        2.0 * xsi - 2.0 * xsi2,
+        -xsi + 2.0 * xsi2,
+    };
+    const amrex::GpuArray<CCTK_REAL, 4> btt{
+        -3.0 + 4.0 * xsi,
+        2.0 - 4.0 * xsi,
+        2.0 - 4.0 * xsi,
+        -1.0 + 4.0 * xsi,
+    };
+    constexpr amrex::GpuArray<CCTK_REAL, 4> bttt{
+        4.0,
+        -4.0,
+        -4.0,
+        4.0,
+    };
+
+    for (int s = 0; s < RKSTAGES; ++s)
+      a[s] = b[s];
+    if (stage == 2) {
+      for (int s = 0; s < RKSTAGES; ++s)
+        a[s] += 0.5 * r * bt[s];
+    } else if (stage == 3 || stage == 4) {
+      const CCTK_REAL r2 = r * r;
+      const CCTK_REAL r3 = r2 * r;
+      const CCTK_REAL at = stage == 3 ? 0.5 * r : r;
+      const CCTK_REAL att = stage == 3 ? 0.25 * r2 : 0.5 * r2;
+      const CCTK_REAL attt = stage == 3 ? 0.0625 * r3 : 0.125 * r3;
+      const CCTK_REAL ak = stage == 3 ? -4.0 : 4.0;
+      for (int s = 0; s < RKSTAGES; ++s)
+        a[s] += at * bt[s] + att * btt[s] + attt * bttt[s];
+      a[2] += attt * ak;
+      a[1] -= attt * ak;
+    }
+  }
+
+  return a;
+}
+
+/** Form one dense RK state on the common parent source-band layout. */
+template <int RKSTAGES>
+CCTK_HOST inline void CalcDenseStateBand(
+    amrex::MultiFab &dense, const amrex::MultiFab &old,
+    const std::array<const amrex::MultiFab *, RKSTAGES> &ks,
+    const CCTK_REAL dtc, const CCTK_REAL xsi, const CCTK_INT stage) {
+  static_assert(RKSTAGES == 3 || RKSTAGES == 4,
+                "CalcDenseStateBand supports only RK3 or RK4");
+  assert(dense.boxArray() == old.boxArray());
+  assert(dense.DistributionMap() == old.DistributionMap());
+  assert(dense.nComp() == old.nComp());
+  assert(dense.nGrowVect() == old.nGrowVect());
+  for (const amrex::MultiFab *const k : ks) {
+    assert(k);
+    assert(k->boxArray() == old.boxArray());
+    assert(k->DistributionMap() == old.DistributionMap());
+    assert(k->nComp() == old.nComp());
+    assert(k->nGrowVect() == old.nGrowVect());
+  }
+
+  const auto coefficients = DenseOutputCoefficients<RKSTAGES>(xsi, stage);
+  const auto dense_arrs = dense.arrays();
+  const auto old_arrs = old.const_arrays();
+  amrex::GpuArray<amrex::MultiArray4<const CCTK_REAL>, RKSTAGES> ks_arrs;
+  for (int s = 0; s < RKSTAGES; ++s)
+    ks_arrs[s] = ks[s]->const_arrays();
+
+  amrex::ParallelFor(
+      dense, dense.nGrowVect(), dense.nComp(),
+      [=] AMREX_GPU_DEVICE(int b, int i, int j, int k, int n) noexcept {
+        CCTK_REAL value = old_arrs[b](i, j, k, n);
+        const CCTK_REAL *const a = coefficients.data();
+        const auto *const k_arr = ks_arrs.data();
+        for (int s = 0; s < RKSTAGES; ++s)
+          value += dtc * a[s] * k_arr[s][b](i, j, k, n);
+        dense_arrs[b](i, j, k, n) = value;
+      });
+  amrex::Gpu::synchronize();
+}
+
 /** Scatter a dense interpolation band only onto parent-prescribed points. */
 CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
     CarpetX::GHExt::PatchData::LevelData &leveldata,

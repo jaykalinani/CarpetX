@@ -292,7 +292,8 @@ void FillPatch_ProlongateToBand(
   assert(!coarsegroupdata.mfab.empty());
 
   const MultiFab &mfab = *groupdata.mfab.at(0);
-  const IntVect &nghosts = mfab.nGrowVect();
+  const IntVect nghosts = subcycling_boundary_nghost(
+      groupdata.indextype, groupdata.nghostzones);
   if (nghosts.max() == 0)
     return;
 
@@ -302,8 +303,12 @@ void FillPatch_ProlongateToBand(
 
   const InterpolaterBoxCoarsener &coarsener = mapper->BoxCoarsener(ratio);
 
+  const BoxArray cell_ba =
+      amrex::convert(mfab.boxArray(), IntVect::TheZeroVector());
+  const MultiFab cell_mfab(cell_ba, mfab.DistributionMap(), /*ncomp=*/1,
+                           nghosts, MFInfo().SetAlloc(false));
   const FabArrayBase::FPinfo &fpc = FabArrayBase::TheFPinfo(
-      mfab, mfab, nghosts, coarsener, fgeom, cgeom, index_space);
+      cell_mfab, cell_mfab, nghosts, coarsener, fgeom, cgeom, index_space);
 
   if (fpc.ba_crse_patch.empty())
     // There is no coarser level for our boundaries, i.e. there is no
@@ -312,7 +317,14 @@ void FillPatch_ProlongateToBand(
 
   // Copy the coarse source band into the coarse patch buffer. ParallelCopy
   // redistributes the source band's cells onto fpc.dm_patch.
-  MultiFab mfab_crse_patch = make_mf_crse_patch<MultiFab>(fpc, ncomps);
+  assert(consumer_band.boxArray() ==
+         amrex::convert(fpc.ba_fine_patch, mfab.ixType()));
+  assert(source_band.boxArray() ==
+         amrex::convert(fpc.ba_crse_patch, mfab.ixType()));
+  assert(consumer_band.DistributionMap() == fpc.dm_patch);
+  assert(source_band.DistributionMap() == fpc.dm_patch);
+  MultiFab mfab_crse_patch =
+      make_mf_crse_patch<MultiFab>(fpc, ncomps, mfab.ixType());
   mf_set_domain_bndry(mfab_crse_patch, cgeom);
   mfab_crse_patch.ParallelCopy(
       source_band, 0, 0, ncomps, IntVect{0} /* don't use source-band ghosts */,

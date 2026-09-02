@@ -41,6 +41,19 @@ using rat64 = rational<int64_t>;
 // count lives in GHExt::num_rk_stages (RK4 uses 4, SSPRK3 uses 3).
 inline constexpr int max_num_rk_stages = 4;
 
+// Fine points on a geometric refinement boundary are valid indices in nodal
+// directions. Build a common interpolation-band footprint with one point of
+// reach there; a policy-specific mask later decides whether the valid point is
+// parent-prescribed or unused padding for a particular group.
+inline amrex::IntVect subcycling_boundary_nghost(
+    const std::array<int, dim> &indextype,
+    const std::array<int, dim> &nghostzones) {
+  return amrex::IntVect(
+      std::max(nghostzones[0], indextype[0] == 0 ? 1 : 0),
+      std::max(nghostzones[1], indextype[1] == 0 ? 1 : 0),
+      std::max(nghostzones[2], indextype[2] == 0 ? 1 : 0));
+}
+
 // TODO: It seems that AMReX now also has `RB90`, `RB180`, and
 // `PolarB` boundary conditions. Make these available as well.
 
@@ -154,6 +167,10 @@ struct GHExt {
 
     bool do_checkpoint; // whether to checkpoint
     bool do_evolve;     // whether this is an evolved state variable
+    // Whether valid fine points on a geometric coarse-fine interface belong
+    // to the parent-prescribed subcycling boundary for this group. Ordinary
+    // coarse-fine ghosts are prescribed independently of this opt-in policy.
+    bool subcycling_prescribe_valid_cf_interface = false;
     bool do_restrict;   // whether to restrict
 
     std::vector<std::vector<why_valid_t> > valid; // [time level][var index]
@@ -389,19 +406,22 @@ struct GHExt {
       // and its distribution over all processes, but holds no data.
       std::unique_ptr<amrex::FabArrayBase> fab;
 
-      // Per-centering coarse-fine ghost masks, built single-threaded by
-      // build_cf_mask and read by get_cf_mask.
-      // Indexed by (indextype[0]<<2)|(indextype[1]<<1)|indextype[2].
-      mutable std::array<std::unique_ptr<amrex::iMultiFab>, 8> cf_masks;
+      // Parent-prescribed coarse-fine boundary masks, built single-threaded by
+      // build_cf_mask and read by get_cf_mask. Every mask contains ordinary
+      // coarse-fine ghosts. The opt-in policy variant also includes valid
+      // points on the geometric refinement interface in nodal directions.
+      // Indexed by centering | (prescribe-valid-interface ? 8 : 0), where
+      // centering=(indextype[0]<<2)|(indextype[1]<<1)|indextype[2].
+      mutable std::array<std::unique_ptr<amrex::iMultiFab>, 16> cf_masks;
 
       // Per-centering coarse-fine boundary-band geometry for subcycling RK
       // k-stages, built lazily by build_bands and used to allocate the
-      // per-group band MultiFabs. Indexed by centering s, mirroring cf_masks.
-      //   source_band_*   : coarse cells under this level's children's cf-ghost
-      //                     footprint (child fpc.ba_crse_patch). Empty on the
-      //                     finest level.
-      //   consumer_band_* : this level's own cf-ghost region (fpc.ba_fine_patch
-      //                     w.r.t. the parent). Empty at level 0.
+      // per-group band MultiFabs. Indexed by centering; the band is a common
+      // superset and the policy-specific mask selects points during scatter.
+      //   source_band_*   : coarse cells under this level's children's common
+      //                     boundary-band footprint. Empty on the finest level.
+      //   consumer_band_* : this level's common boundary-band footprint with
+      //                     respect to the parent. Empty at level 0.
       // A non-null BoxArray slot (even if the BoxArray itself is empty) means
       // the geometry for that centering has been built; both slots are set
       // together. The DistributionMapping is the fpc.dm_patch the consumer band
@@ -427,7 +447,8 @@ struct GHExt {
       // warm the centerings single-threaded via build_cf_mask first.
       amrex::iMultiFab *
       get_cf_mask(const std::array<int, dim> &indextype,
-                  const std::array<int, dim> &nghostzones) const;
+                  const std::array<int, dim> &nghostzones,
+                  bool prescribe_valid_cf_interface) const;
 
       // Build and cache the coarse-fine ghost mask for this (level,
       // centering). Idempotent; a no-op at level 0 / when subcycling is
@@ -435,7 +456,8 @@ struct GHExt {
       // OpenMP region, so this must run single-threaded (no active MFIter, no
       // enclosing parallel region).
       void build_cf_mask(const std::array<int, dim> &indextype,
-                         const std::array<int, dim> &nghostzones) const;
+                         const std::array<int, dim> &nghostzones,
+                         bool prescribe_valid_cf_interface) const;
 
       cctkGHptr patch_cctkGH;
       std::vector<cctkGHptr> local_cctkGHs; // [component]
@@ -479,13 +501,14 @@ struct GHExt {
         // Coarse-fine boundary bands holding the subcycling RK k-stages
         // (zero-ghost, numvars comps), allocated lazily by build_bands only
         // under subcycling for evolved groups. Indexed by RK stage.
-        //   ks_source_band[s]  : coarse cells under children's cf-ghost
+        //   ks_source_band[s]  : coarse cells under children's common boundary
         //                        footprint, written by setks and read as the
         //                        prolongation source. Empty on the finest
         //                        level.
-        //   ks_consumer_band[s]: this level's own cf-ghost region, filled by
-        //                        prolongation from the parent and read by the
-        //                        dense-output kernel. Empty at level 0.
+        //   ks_consumer_band[s]: this level's common boundary footprint,
+        //                        filled by prolongation from the parent and
+        //                        read by the dense-output kernel. Empty at
+        //                        level 0.
         mutable std::array<std::unique_ptr<amrex::MultiFab>, max_num_rk_stages>
             ks_source_band;
         mutable std::array<std::unique_ptr<amrex::MultiFab>, max_num_rk_stages>

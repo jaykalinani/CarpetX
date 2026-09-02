@@ -177,7 +177,9 @@ CCTK_HOST CCTK_ATTRIBUTE_ALWAYS_INLINE inline void CalcYfFromKcs_impl(
     const Loop::GF3D2layout layout(cctkGH, indextype);
 
     amrex::iMultiFab *const cf_mfab =
-        leveldata.get_cf_mask(groupdata.indextype, groupdata.nghostzones);
+        leveldata.get_cf_mask(
+            groupdata.indextype, groupdata.nghostzones,
+            groupdata.subcycling_prescribe_valid_cf_interface);
     // No coarse-fine ghosts to fill at level 0 or when subcycling is disabled.
     if (cf_mfab == nullptr)
       continue;

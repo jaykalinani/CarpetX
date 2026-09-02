@@ -404,6 +404,34 @@ bool get_group_evolve_flag(const int gi) {
   }
 }
 
+bool get_group_subcycling_prescribe_valid_cf_interface_flag(const int gi) {
+  const int tags = CCTK_GroupTagsTableI(gi);
+  assert(tags >= 0);
+  char buf[100];
+  const int iret = Util_TableGetString(
+      tags, sizeof buf, buf, "subcycling_prescribe_valid_cf_interface");
+  if (iret == UTIL_ERROR_TABLE_NO_SUCH_KEY)
+    return false;
+  if (iret >= 0) {
+    std::string str(buf);
+    for (auto &c : str)
+      c = tolower(c);
+    if (str == "yes")
+      return true;
+    if (str == "no")
+      return false;
+    CCTK_VERROR(
+        "Grid-function group %s has invalid tag "
+        "subcycling_prescribe_valid_cf_interface=\"%s\"; expected yes or no",
+        CCTK_FullGroupName(gi), buf);
+  }
+  CCTK_VERROR(
+      "Could not read tag subcycling_prescribe_valid_cf_interface for "
+      "grid-function group %s (Util_TableGetString returned %d)",
+      CCTK_FullGroupName(gi), iret);
+  return false;
+}
+
 std::array<int, dim> get_group_indextype(const int gi) {
   DECLARE_CCTK_PARAMETERS;
 
@@ -876,6 +904,8 @@ GHExt::PatchData::LevelData::GroupData::GroupData(
   numvars = group.numvars;
   do_checkpoint = get_group_checkpoint_flag(gi);
   do_evolve = get_group_evolve_flag(gi);
+  subcycling_prescribe_valid_cf_interface =
+      get_group_subcycling_prescribe_valid_cf_interface_flag(gi);
   do_restrict = get_group_restrict_flag(gi);
   indextype = get_group_indextype(gi);
   nghostzones = get_group_nghostzones(gi);
@@ -962,16 +992,20 @@ GHExt::PatchData::LevelData::GroupData::GroupData(
 
 void GHExt::PatchData::LevelData::build_cf_mask(
     const std::array<int, dim> &indextype,
-    const std::array<int, dim> &nghostzones) const {
+    const std::array<int, dim> &nghostzones,
+    const bool prescribe_valid_cf_interface) const {
   // Nothing to mask at the coarsest level or outside subcycling runs.
   if (level == 0 || !ghext->use_subcycling)
     return;
 
-  const int s = (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
+  const int centering =
+      (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
+  const int s = centering | (prescribe_valid_cf_interface ? 8 : 0);
   if (cf_masks[s])
     return; // already built (idempotent: warm-up runs every step)
 
-  const amrex::IntVect ng(nghostzones[0], nghostzones[1], nghostzones[2]);
+  const amrex::IntVect ng =
+      subcycling_boundary_nghost(indextype, nghostzones);
   const amrex::BoxArray gba = amrex::convert(
       fab->boxArray(),
       amrex::IndexType(
@@ -982,31 +1016,68 @@ void GHExt::PatchData::LevelData::build_cf_mask(
   auto mask = std::make_unique<amrex::iMultiFab>(gba, fab->DistributionMap(),
                                                  /*ncomp=*/1, ng);
   const auto &geom = ghext->patchdata.at(patch).amrcore->Geom(level);
-  // covered=0  : ghosts filled by same-level FillBoundary (intra-/inter-
-  //              process and periodic-image — see getFB(ngrow, period)
-  //              overlay in AMReX_FabArray.H).
-  // notcovered : coarse-fine prolongation ghosts. Set to cf_ghost (truthy).
+  // covered=0  : points supplied by another fine-level box (including
+  //              periodic images).
+  // notcovered : ordinary coarse-fine prolongation ghosts.
   // physbnd=0  : physical-outer boundary ghosts.
-  // interior=0 : not read by the consumer (loop_device_idx<ghosts>).
+  // interior=0 : fine-level valid points; opt-in staggered interface points
+  //              are added below.
   mask->BuildMask(geom.Domain(), geom.periodicity(),
                   /*covered=*/0,
                   /*notcovered=*/cf_ghost,
                   /*physbnd=*/0,
                   /*interior=*/0);
+
+  // In a nodal direction, the geometric fine-region boundary is itself a
+  // valid fine point. For groups which explicitly opt in, extend the mask
+  // inward by exactly that one point. The outward neighbour is truthy only at
+  // a real coarse-fine boundary because BuildMask made same-level, periodic,
+  // and physical boundaries zero. Restricting writes to each FAB's valid
+  // faces prevents the in-place update from propagating farther inward.
+  const amrex::IntVect nodal(indextype[0] == 0, indextype[1] == 0,
+                             indextype[2] == 0);
+  if (prescribe_valid_cf_interface && nodal.max() != 0) {
+    for (amrex::MFIter mfi(*mask); mfi.isValid(); ++mfi) {
+      const amrex::Box valid = mfi.validbox();
+      const auto arr = mask->array(mfi);
+      const auto lo = amrex::lbound(valid);
+      const auto hi = amrex::ubound(valid);
+      amrex::ParallelFor(
+          valid, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+            bool prescribed = false;
+            if (nodal[0] && ng[0] > 0)
+              prescribed = (i == lo.x && arr(i - 1, j, k) == cf_ghost) ||
+                           (i == hi.x && arr(i + 1, j, k) == cf_ghost);
+            if (!prescribed && nodal[1] && ng[1] > 0)
+              prescribed = (j == lo.y && arr(i, j - 1, k) == cf_ghost) ||
+                           (j == hi.y && arr(i, j + 1, k) == cf_ghost);
+            if (!prescribed && nodal[2] && ng[2] > 0)
+              prescribed = (k == lo.z && arr(i, j, k - 1) == cf_ghost) ||
+                           (k == hi.z && arr(i, j, k + 1) == cf_ghost);
+            if (prescribed)
+              arr(i, j, k) = cf_ghost;
+          });
+    }
+    amrex::Gpu::synchronize();
+  }
   cf_masks[s] = std::move(mask);
 }
 
 amrex::iMultiFab *GHExt::PatchData::LevelData::get_cf_mask(
     const std::array<int, dim> &indextype,
-    const std::array<int, dim> &nghostzones) const {
+    const std::array<int, dim> &nghostzones,
+    const bool prescribe_valid_cf_interface) const {
   // Pure reader: no MFIter, no cache store, so concurrent reads are safe.
   // The slot must have been warmed single-threaded via build_cf_mask; an
   // un-warmed centering is a missing warm-up and trips the assert below.
   if (level == 0 || !ghext->use_subcycling)
     return nullptr;
 
-  const int s = (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
-  const amrex::IntVect ng(nghostzones[0], nghostzones[1], nghostzones[2]);
+  const int centering =
+      (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
+  const int s = centering | (prescribe_valid_cf_interface ? 8 : 0);
+  const amrex::IntVect ng =
+      subcycling_boundary_nghost(indextype, nghostzones);
   // Slot must be warm (build_cf_mask ran single-threaded). Sharing assumption:
   // all groups of this centering at this level use the same nghostzones; if the
   // nGrowVect check trips, widen the cache key from `centering` to
@@ -1024,9 +1095,6 @@ void GHExt::PatchData::LevelData::build_bands(
     return;
 
   const std::array<int, dim> &indextype = groupdata.indextype;
-  // Sharing assumption (as for cf_masks): all groups of this centering at this
-  // level use the same nghostzones and interpolator, so the band geometry can
-  // be cached per (level, centering).
   const int s = (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
 
   const auto &patchdata = ghext->patchdata.at(patch);
@@ -1054,18 +1122,25 @@ void GHExt::PatchData::LevelData::build_bands(
   // must run after all levels exist so the source band can see its children.
   if (!source_band_ba[s] || !source_band_child_ba[s] ||
       *source_band_child_ba[s] != current_child_ba) {
-    // Consumer band == this level's cf-ghost region (fpc.ba_fine_patch w.r.t.
-    // the parent). Empty at level 0.
+    // Consumer band == this level's common boundary superset with respect to
+    // the parent. Empty at level 0; the policy mask selects scatter targets.
     amrex::BoxArray fba;
     amrex::DistributionMapping fdm;
     if (level > 0) {
       const auto &mfab = *groupdata.mfab.at(0);
-      const amrex::IntVect &nghosts = mfab.nGrowVect();
+      const amrex::IntVect nghosts =
+          subcycling_boundary_nghost(indextype, groupdata.nghostzones);
       const auto &fgeom = patchdata.amrcore->Geom(level);
       const auto &cgeom = patchdata.amrcore->Geom(level - 1);
-      const amrex::FabArrayBase::FPinfo &fpc = amrex::FabArrayBase::TheFPinfo(
-          mfab, mfab, nghosts, coarsener, fgeom, cgeom, index_space);
-      fba = fpc.ba_fine_patch;
+      const amrex::BoxArray cell_ba = amrex::convert(
+          mfab.boxArray(), amrex::IntVect::TheZeroVector());
+      const amrex::MultiFab cell_mfab(
+          cell_ba, mfab.DistributionMap(), /*ncomp=*/1, nghosts,
+          amrex::MFInfo().SetAlloc(false));
+      const amrex::FabArrayBase::FPinfo &fpc =
+          amrex::FabArrayBase::TheFPinfo(cell_mfab, cell_mfab, nghosts,
+                                         coarsener, fgeom, cgeom, index_space);
+      fba = amrex::convert(fpc.ba_fine_patch, mfab.ixType());
       fdm = fpc.dm_patch;
     }
     consumer_band_ba[s] = std::make_unique<amrex::BoxArray>(fba);
@@ -1080,13 +1155,20 @@ void GHExt::PatchData::LevelData::build_bands(
       const auto &childgroupdata =
           *childleveldata.groupdata.at(groupdata.groupindex);
       const auto &childmfab = *childgroupdata.mfab.at(0);
-      const amrex::IntVect &childnghosts = childmfab.nGrowVect();
+      const amrex::IntVect childnghosts = subcycling_boundary_nghost(
+          childgroupdata.indextype, childgroupdata.nghostzones);
       const auto &fgeom = patchdata.amrcore->Geom(level + 1);
       const auto &cgeom = patchdata.amrcore->Geom(level);
+      const amrex::BoxArray child_cell_ba = amrex::convert(
+          childmfab.boxArray(), amrex::IntVect::TheZeroVector());
+      const amrex::MultiFab child_cell_mfab(
+          child_cell_ba, childmfab.DistributionMap(), /*ncomp=*/1,
+          childnghosts, amrex::MFInfo().SetAlloc(false));
       const amrex::FabArrayBase::FPinfo &fpc =
-          amrex::FabArrayBase::TheFPinfo(childmfab, childmfab, childnghosts,
-                                         coarsener, fgeom, cgeom, index_space);
-      cba = fpc.ba_crse_patch;
+          amrex::FabArrayBase::TheFPinfo(
+              child_cell_mfab, child_cell_mfab, childnghosts, coarsener, fgeom,
+              cgeom, index_space);
+      cba = amrex::convert(fpc.ba_crse_patch, childmfab.ixType());
       cdm = fpc.dm_patch;
     }
     source_band_ba[s] = std::make_unique<amrex::BoxArray>(cba);

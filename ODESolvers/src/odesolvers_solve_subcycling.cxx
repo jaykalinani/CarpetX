@@ -138,6 +138,9 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   active_levels->loop_serially([&](const auto &leveldata) {
     for (const int gi : var_groups) {
       const auto &gd = *leveldata.groupdata.at(gi);
+      leveldata.build_cf_mask(
+          gd.indextype, gd.nghostzones,
+          gd.subcycling_prescribe_valid_cf_interface);
       leveldata.build_bands(gd);
     }
   });

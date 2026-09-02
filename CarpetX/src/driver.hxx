@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -410,9 +411,11 @@ struct GHExt {
       // build_cf_mask and read by get_cf_mask. Every mask contains ordinary
       // coarse-fine ghosts. The opt-in policy variant also includes valid
       // points on the geometric refinement interface in nodal directions.
-      // Indexed by centering | (prescribe-valid-interface ? 8 : 0), where
-      // centering=(indextype[0]<<2)|(indextype[1]<<1)|indextype[2].
-      mutable std::array<std::unique_ptr<amrex::iMultiFab>, 16> cf_masks;
+      // Keyed by centering/policy and the effective ghost width. Groups with
+      // the same centering can legitimately request different halo widths.
+      mutable std::map<std::array<int, 4>,
+                       std::unique_ptr<amrex::iMultiFab> >
+          cf_masks;
 
       // Returns the coarse-fine ghost mask for this (level, centering), or
       // nullptr at level 0 / when subcycling is disabled. Pure reader,

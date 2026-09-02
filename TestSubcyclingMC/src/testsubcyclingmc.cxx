@@ -245,11 +245,24 @@ extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
         untagged.subcycling_prescribe_valid_cf_interface);
     leveldata.build_cf_mask(tagged.indextype, tagged.nghostzones,
                             tagged.subcycling_prescribe_valid_cf_interface);
-    leveldata.build_bands(untagged);
     leveldata.build_bands(tagged);
+    leveldata.build_bands(untagged);
 
-    if (leveldata.level == 0)
+    // The fields deliberately share a centering but use DDF5 and DDF1,
+    // respectively. Their coarse source footprints must therefore remain
+    // group-specific, independent of the order in which build_bands is called.
+    if (leveldata.level == 0) {
+      const auto *const untagged_source =
+          untagged.ks_source_band.at(0).get();
+      const auto *const tagged_source = tagged.ks_source_band.at(0).get();
+      if (!untagged_source || !tagged_source)
+        CCTK_VERROR("Ownership test has no coarse-fine source band");
+      if (untagged_source->boxArray() == tagged_source->boxArray())
+        CCTK_VERROR(
+            "Subcycling source-band geometry was shared across DDF1 and DDF5");
       return;
+    }
+
     tested_fine_level = true;
 
     auto *const untagged_mask = leveldata.get_cf_mask(
@@ -271,9 +284,6 @@ extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
     assert(untagged_dst.DistributionMap() == tagged_dst.DistributionMap());
     assert(untagged_mask->boxArray() == untagged_dst.boxArray());
     assert(tagged_mask->boxArray() == tagged_dst.boxArray());
-    assert(untagged_band->boxArray() == tagged_band->boxArray());
-    assert(untagged_band->DistributionMap() == tagged_band->DistributionMap());
-
     const amrex::IntVect ng(untagged.nghostzones[0],
                             untagged.nghostzones[1],
                             untagged.nghostzones[2]);

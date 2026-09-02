@@ -414,33 +414,6 @@ struct GHExt {
       // centering=(indextype[0]<<2)|(indextype[1]<<1)|indextype[2].
       mutable std::array<std::unique_ptr<amrex::iMultiFab>, 16> cf_masks;
 
-      // Per-centering coarse-fine boundary-band geometry for subcycling RK
-      // k-stages, built lazily by build_bands and used to allocate the
-      // per-group band MultiFabs. Indexed by centering; the band is a common
-      // superset and the policy-specific mask selects points during scatter.
-      //   source_band_*   : coarse cells under this level's children's common
-      //                     boundary-band footprint. Empty on the finest level.
-      //   consumer_band_* : this level's common boundary-band footprint with
-      //                     respect to the parent. Empty at level 0.
-      // A non-null BoxArray slot (even if the BoxArray itself is empty) means
-      // the geometry for that centering has been built; both slots are set
-      // together. The DistributionMapping is the fpc.dm_patch the consumer band
-      // must share for the band->band FillPatchInterp to stay local. Shared by
-      // both band families (ks_* and old_*).
-      mutable std::array<std::unique_ptr<amrex::BoxArray>, 8> source_band_ba;
-      mutable std::array<std::unique_ptr<amrex::DistributionMapping>, 8>
-          source_band_dm;
-      mutable std::array<std::unique_ptr<amrex::BoxArray>, 8> consumer_band_ba;
-      mutable std::array<std::unique_ptr<amrex::DistributionMapping>, 8>
-          consumer_band_dm;
-
-      // The child (level+1) BoxArray the source band was last built against.
-      // A mismatch with the current child layout (which AMReX may have changed
-      // without re-making this coarser level) rebuilds the source band. null
-      // means not yet built; an empty BoxArray means there was no child.
-      mutable std::array<std::unique_ptr<amrex::BoxArray>, 8>
-          source_band_child_ba;
-
       // Returns the coarse-fine ghost mask for this (level, centering), or
       // nullptr at level 0 / when subcycling is disabled. Pure reader,
       // side-effect-free and safe to call from a parallel consume; callers MUST
@@ -498,6 +471,19 @@ struct GHExt {
         // each amrex::MultiFab has numvars components
         std::vector<std::unique_ptr<amrex::MultiFab> > mfab; // [time level]
 
+        // Coarse-fine temporal-band geometry is group-specific because the
+        // required coarse footprint depends on this group's interpolator and
+        // ghost width, not only on its centering. The child layout snapshots
+        // detect child-only regrids and load balancing while the parent level
+        // survives.
+        mutable std::unique_ptr<amrex::BoxArray> source_band_ba;
+        mutable std::unique_ptr<amrex::DistributionMapping> source_band_dm;
+        mutable std::unique_ptr<amrex::BoxArray> consumer_band_ba;
+        mutable std::unique_ptr<amrex::DistributionMapping> consumer_band_dm;
+        mutable std::unique_ptr<amrex::BoxArray> source_band_child_ba;
+        mutable std::unique_ptr<amrex::DistributionMapping>
+            source_band_child_dm;
+
         // Coarse-fine boundary bands holding the subcycling RK k-stages
         // (zero-ghost, numvars comps), allocated lazily by build_bands only
         // under subcycling for evolved groups. Indexed by RK stage.
@@ -550,8 +536,8 @@ struct GHExt {
       // TODO: right now this is sized for the total number of groups
       std::vector<std::unique_ptr<GroupData> > groupdata; // [group index]
 
-      // Build (lazily, idempotently) the coarse-fine band geometry for this
-      // group's centering and allocate the group's ks_source_band/
+      // Build (lazily, idempotently) this group's coarse-fine band geometry
+      // and allocate the group's ks_source_band/
       // ks_consumer_band MultiFabs (zero ghost, numvars comps). A no-op when
       // subcycling is disabled or the group is not evolved. Computes the
       // source-band geometry from the next-finer level's fpc, so it must run

@@ -166,9 +166,10 @@ FillSourceBand(const CarpetX::GHExt::PatchData::LevelData &leveldata,
 
 /** Scatter a dense interpolation band only onto parent-prescribed points. */
 CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
-    CarpetX::GHExt::PatchData::LevelData &leveldata,
+    const CarpetX::GHExt::PatchData::LevelData &leveldata,
     const CarpetX::GHExt::PatchData::LevelData::GroupData &groupdata,
-    amrex::MultiFab &dst, const amrex::MultiFab &band) {
+    amrex::MultiFab &dst, const amrex::MultiFab &band,
+    const bool prescribe_valid_cf_interface) {
   const int nvars = groupdata.numvars;
   assert(dst.nComp() >= nvars);
   assert(band.nComp() >= nvars);
@@ -177,7 +178,7 @@ CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
                           groupdata.nghostzones[2]);
   amrex::iMultiFab *const cf_mask = leveldata.get_cf_mask(
       groupdata.indextype, groupdata.nghostzones,
-      groupdata.subcycling_prescribe_valid_cf_interface);
+      prescribe_valid_cf_interface);
   assert(cf_mask);
   assert(cf_mask->boxArray() == dst.boxArray());
   assert(cf_mask->DistributionMap() == dst.DistributionMap());
@@ -235,6 +236,18 @@ CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
       });
   // The temporary scatter fields must outlive the kernel which reads them.
   amrex::Gpu::synchronize();
+}
+
+// Forward evolution follows the group's ownership policy. Recovery calls the
+// overload above explicitly with false so checkpointed valid staggered points
+// remain owned by the regular interior dataset.
+CCTK_HOST inline void ScatterBandToCoarseFineGhosts(
+    const CarpetX::GHExt::PatchData::LevelData &leveldata,
+    const CarpetX::GHExt::PatchData::LevelData::GroupData &groupdata,
+    amrex::MultiFab &dst, const amrex::MultiFab &band) {
+  ScatterBandToCoarseFineGhosts(
+      leveldata, groupdata, dst, band,
+      groupdata.subcycling_prescribe_valid_cf_interface);
 }
 
 /**

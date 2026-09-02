@@ -62,7 +62,8 @@ void prolongate_dense_state(
 
     Subcycling::ScatterBandToCoarseFineGhosts(
         leveldata, groupdata, *groupdata.mfab.at(0),
-        *groupdata.dense_consumer_band);
+        *groupdata.dense_consumer_band,
+        groupdata.subcycling_prescribe_valid_cf_interface);
   }
 }
 
@@ -504,22 +505,44 @@ extern "C" void ODESolvers_Solve_Subcycling_Recovery(CCTK_ARGUMENTS) {
     return;
 
   // Refill each recovered fine level's refinement-boundary (cf) ghosts.
-  // Time-aligned levels use spatial tl=0 prolongation. Unsynchronized recovery
-  // is rejected until the persistent dense consumer band is checkpointed;
-  // separately stored temporal constituents cannot reproduce nonlinear
-  // source-first prolongation.
+  // Time-aligned levels use spatial tl=0 prolongation. At an asynchronous
+  // checkpoint, regular I/O already restored every valid point (including
+  // valid staggered interface points); restore only allocated CF ghosts from
+  // the accepted post-PostStep boundary snapshot. The parent's source bands
+  // remain available for D1's source-compose-before-prolongate path in the
+  // next fine substep.
   if (var_groups.size() > 0) {
+    // Recovery rebuilt band geometry before reading. Warm the ghost-only masks
+    // used below without opting valid staggered interface points into the
+    // overwrite set.
+    for (const auto &patchdata : ghext->patchdata)
+      for (const auto &leveldata : patchdata.leveldata)
+        for (const int gi : var_groups) {
+          const auto &groupdata = *leveldata.groupdata.at(gi);
+          leveldata.build_cf_mask(groupdata.indextype, groupdata.nghostzones,
+                                  /*prescribe_valid_cf_interface=*/false);
+        }
+
     for (const auto &patchdata : ghext->patchdata) {
       for (const auto &leveldata : patchdata.leveldata) {
         if (leveldata.level == 0)
           continue;
         const auto &prev_leveldata =
             patchdata.leveldata.at(leveldata.level - 1);
-        if (leveldata.iteration != prev_leveldata.iteration)
-          CCTK_VERROR(
-              "Recovery of an unsynchronized subcycling checkpoint is not "
-              "supported with source-composed dense output; checkpointing "
-              "the persistent dense consumer band is required");
+        if (leveldata.iteration == prev_leveldata.iteration)
+          continue;
+        for (const int gi : var_groups) {
+          const auto &groupdata = *leveldata.groupdata.at(gi);
+          const auto &coarsegroupdata =
+              *prev_leveldata.groupdata.at(gi);
+          if (!coarsegroupdata.recovered_source_bands ||
+              !groupdata.recovered_accepted_consumer_band)
+            CCTK_VERROR(
+                "Cannot exactly recover asynchronous subcycling group %s "
+                "at patch %d level %d: checkpoint lacks D1 parent source "
+                "history or accepted fine boundary snapshot",
+                CCTK_FullGroupName(gi), leveldata.patch, leveldata.level);
+        }
       }
     }
 
@@ -527,10 +550,30 @@ extern "C" void ODESolvers_Solve_Subcycling_Recovery(CCTK_ARGUMENTS) {
                     "ODESolvers_Solve_Subcycling_Recovery requires the tl=0 "
                     "interior to be populated by checkpoint recovery");
 
-    // The precheck established that all levels are time-aligned, so ordinary
-    // spatial prolongation reconstructs their coarse-fine ghosts.
+    // Establish ordinary same-time spatial ghosts first. The exact accepted
+    // snapshots below replace only asynchronous CF ghosts.
     SyncGroupsByDirIProlongateOnly(cctkGH, var_groups.size(), var_groups.data(),
                                    nullptr, /*tl=*/0);
+
+    for (const auto &patchdata : ghext->patchdata) {
+      for (auto &leveldata : patchdata.leveldata) {
+        if (leveldata.level == 0)
+          continue;
+        const auto &prev_leveldata =
+            patchdata.leveldata.at(leveldata.level - 1);
+        if (leveldata.iteration == prev_leveldata.iteration)
+          continue;
+        for (const int gi : var_groups) {
+          const auto &groupdata = *leveldata.groupdata.at(gi);
+          assert(groupdata.dense_consumer_band);
+          Subcycling::ScatterBandToCoarseFineGhosts(
+              leveldata, groupdata, *groupdata.mfab.at(0),
+              *groupdata.dense_consumer_band,
+              /*prescribe_valid_cf_interface=*/false);
+        }
+      }
+    }
+    synchronize();
     var.set_valid(make_valid_all());
   }
 }

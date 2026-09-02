@@ -225,15 +225,50 @@ def check_production_ordering():
     assert "CalcYfFromKcs_MFlevel" not in forward
     recovery = source[source.index(
         'extern "C" void ODESolvers_Solve_Subcycling_Recovery'):]
-    assert recovery.index("for (const auto &patchdata : ghext->patchdata)") \
-        < recovery.index("leveldata.iteration != prev_leveldata.iteration") \
-        < recovery.index("Recovery of an unsynchronized subcycling checkpoint") \
-        < recovery.index("SyncGroupsByDirIProlongateOnly")
+    require_history = recovery.index("recovered_source_bands")
+    spatial = recovery.index("SyncGroupsByDirIProlongateOnly")
+    restore_accepted = recovery.index("recovered_accepted_consumer_band")
+    scatter_accepted = recovery.rindex("ScatterBandToCoarseFineGhosts")
+    assert require_history < spatial < scatter_accepted
+    assert restore_accepted < scatter_accepted
+    assert "/*prescribe_valid_cf_interface=*/false" in recovery
     assert "CalcYfFromKcs_MFlevel" not in recovery
     print("production wiring: dense source composition precedes one prolongation")
+
+
+def check_checkpoint_contract():
+    repo = Path(__file__).resolve().parents[2]
+    driver = (repo / "CarpetX/src/driver.cxx").read_text()
+    header = (repo / "CarpetX/src/driver.hxx").read_text()
+    fillpatch = (repo / "CarpetX/src/fillpatch.cxx").read_text()
+    openpmd = (repo / "CarpetX/src/io_openpmd.cxx").read_text()
+    silo = (repo / "CarpetX/src/io_silo.cxx").read_text()
+
+    # The schema stores source-space constituents, never independently
+    # prolonged constituents, plus one accepted boundary snapshot.
+    for token in ("ks_source", "old_source", "accepted_consumer"):
+        assert token in header
+        assert token in driver
+        assert f"band_kind::{token}" in openpmd
+        assert f"band_kind::{token}" in silo
+    for obsolete in ("band_kind::ks_consumer", "band_kind::old_consumer"):
+        assert obsolete not in openpmd
+        assert obsolete not in silo
+
+    # The boundary snapshot is gathered from the actual tl=0 state at output
+    # time, after PostStep, rather than re-created from temporal constituents.
+    for backend in (openpmd, silo):
+        snapshot = backend.index("SnapshotCoarseFineStateToBand")
+        write_accepted = backend.index("band_kind::accepted_consumer", snapshot)
+        assert snapshot < write_accepted
+        assert "*groupdata.mfab.at(0)" in backend[snapshot:write_accepted]
+    assert fillpatch.index("consumer_band.setVal(0.0)") \
+        < fillpatch.index("consumer_band.ParallelCopy")
+    print("checkpoint wiring: source history + accepted ghost snapshot pass")
 
 
 if __name__ == "__main__":
     check_rk3_rk4_ordering()
     check_coefficient_values()
     check_production_ordering()
+    check_checkpoint_contract()

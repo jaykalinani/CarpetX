@@ -1,6 +1,7 @@
 #include "io_silo.hxx"
 
 #include "driver.hxx"
+#include "fillpatch.hxx"
 #include "io_meta.hxx"
 #include "mpi_types.hxx"
 #include "timer.hxx"
@@ -601,10 +602,9 @@ void InputSilo(const cGH *restrict const cctkGH,
       assert(file);
     }
 
-    // Bands are written all-or-nothing (only at unsynchronized checkpoints), so
-    // detect their presence once with a global flag. This keeps the band read
-    // symmetric with the regular read; a per-variable file probe inside the
-    // loop would desync the band owner's MPI_Recv.
+    // New-format D1 bands are written all-or-nothing at unsynchronized
+    // checkpoints. Detect them once with a global flag; probing a legacy
+    // consumer-band name must not opt into the new source-history read path.
     bool file_has_bands = false;
     if (ghext->use_subcycling) {
       int local_has_bands = 0;
@@ -635,10 +635,12 @@ void InputSilo(const cGH *restrict const cctkGH,
                 }
               };
               for (int s = 0; s < max_num_rk_stages; ++s)
-                probe(groupdata.ks_consumer_band[s].get(),
-                      band_kind::ks_consumer, s);
-              probe(groupdata.old_consumer_band.get(), band_kind::old_consumer,
+                probe(groupdata.ks_source_band[s].get(),
+                      band_kind::ks_source, s);
+              probe(groupdata.old_source_band.get(), band_kind::old_source,
                     -1);
+              probe(groupdata.dense_consumer_band.get(),
+                    band_kind::accepted_consumer, -1);
             }
           }
         }
@@ -810,10 +812,9 @@ void InputSilo(const cGH *restrict const cctkGH,
 
           } // for component
 
-          // Subcycling consumer bands: zero-ghost MultiFabs with their own
-          // DistributionMap, each read in its own component loop mirroring the
-          // Phase 1 write (reversed MPI). When file_has_bands, every rebuilt
-          // non-empty band is present in full.
+          // D1 source history and accepted boundary snapshot, each read in its
+          // own component loop mirroring the write (reversed MPI). When the
+          // new-format probe succeeds, every rebuilt non-empty band is present.
           if (file_has_bands) {
             const int centering = [&]() {
               const int rank = indextype.cellCentered(0) +
@@ -917,11 +918,20 @@ void InputSilo(const cGH *restrict const cctkGH,
               } // for band component
             };
 
+            bool have_sources = groupdata.old_source_band != nullptr;
+            if (groupdata.old_source_band)
+              read_band(groupdata.old_source_band.get(),
+                        band_kind::old_source, -1);
             for (int s = 0; s < max_num_rk_stages; ++s)
-              read_band(groupdata.ks_consumer_band[s].get(),
-                        band_kind::ks_consumer, s);
-            read_band(groupdata.old_consumer_band.get(),
-                      band_kind::old_consumer, -1);
+              if (groupdata.ks_source_band[s])
+                read_band(groupdata.ks_source_band[s].get(),
+                          band_kind::ks_source, s);
+            groupdata.recovered_source_bands = have_sources;
+            if (groupdata.dense_consumer_band) {
+              read_band(groupdata.dense_consumer_band.get(),
+                        band_kind::accepted_consumer, -1);
+              groupdata.recovered_accepted_consumer_band = true;
+            }
           } // if file_has_bands
 
         } // for gi
@@ -1409,11 +1419,10 @@ void OutputSilo(const cGH *restrict const cctkGH,
 
           } // for component
 
-          // Subcycling consumer bands: zero-ghost MultiFabs in this level's
-          // index space with their own DistributionMap, so each gets its own
-          // component loop. Geometry is rebuilt on recovery; we serialize only
-          // the data, namespaced by a band tag. 2D slice output covers only the
-          // main grid data, so bands are skipped entirely when slicing.
+          // Preserve D1's source history and the accepted post-PostStep fine
+          // boundary state. The latter is gathered at output time so recovery
+          // reproduces the actual checkpoint point, including projections.
+          // 2D slice output covers only main-grid data.
           if (write_bands && !slice) {
             const int centering = [&]() {
               const int rank = indextype.cellCentered(0) +
@@ -1438,6 +1447,11 @@ void OutputSilo(const cGH *restrict const cctkGH,
             const amrex::Real *const x0 = geom.ProbLo();
             const amrex::Real *const dx = geom.CellSize();
             const std::array<int, dim> band_nghosts{0, 0, 0};
+
+            if (groupdata.dense_consumer_band)
+              SnapshotCoarseFineStateToBand(
+                  groupdata, *groupdata.dense_consumer_band,
+                  *groupdata.mfab.at(0), geom);
 
             const auto write_band = [&](const amrex::MultiFab *const band,
                                         const band_kind kind, const int stage) {
@@ -1588,10 +1602,12 @@ void OutputSilo(const cGH *restrict const cctkGH,
             };
 
             for (int s = 0; s < max_num_rk_stages; ++s)
-              write_band(groupdata.ks_consumer_band[s].get(),
-                         band_kind::ks_consumer, s);
-            write_band(groupdata.old_consumer_band.get(),
-                       band_kind::old_consumer, -1);
+              write_band(groupdata.ks_source_band[s].get(),
+                         band_kind::ks_source, s);
+            write_band(groupdata.old_source_band.get(),
+                       band_kind::old_source, -1);
+            write_band(groupdata.dense_consumer_band.get(),
+                       band_kind::accepted_consumer, -1);
           } // if write_bands
 
         } // for gi

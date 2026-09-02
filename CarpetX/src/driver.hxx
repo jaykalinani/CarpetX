@@ -521,6 +521,13 @@ struct GHExt {
         // independently.
         mutable std::unique_ptr<amrex::MultiFab> dense_consumer_band;
 
+        // Set only when recovery reads the complete source-composed temporal
+        // history or accepted coarse-fine boundary snapshot from a new-format
+        // asynchronous checkpoint. Allocation alone does not imply valid
+        // contents: synchronized and legacy checkpoints do not store bands.
+        mutable bool recovered_source_bands = false;
+        mutable bool recovered_accepted_consumer_band = false;
+
         // flux register between this and the next coarser level
         std::unique_ptr<amrex::FluxRegister> freg;
         // associated flux group indices
@@ -622,13 +629,14 @@ extern std::unique_ptr<GHExt> ghext;
 // false, the fine consumer bands hold mid-cycle state that must be serialized.
 bool all_levels_synchronized();
 
-// Subcycling consumer-band kinds serialized at unsynchronized checkpoints:
-// ks_consumer is the RK stages 0..max_num_rk_stages-1, old_consumer the u(t_n)
-// snapshot.
-enum class band_kind { ks_consumer, old_consumer };
+// Source-composed temporal history and the accepted fine boundary snapshot
+// serialized at unsynchronized checkpoints. The source bands are needed by
+// the next fine substep; accepted_consumer restores only fine CF ghosts at the
+// recovery point. Valid staggered-interface points are regular checkpoint
+// interiors and are deliberately not reconstructed from this band.
+enum class band_kind { ks_source, old_source, accepted_consumer };
 
-// Token identifying a consumer band in checkpoint names: "ksc_s00".."ksc_s03"
-// for ks_consumer, "oldc" for old_consumer. Shared by both IO backends.
+// Token identifying a band in checkpoint names. Shared by both IO backends.
 std::string subcycling_band_tag(band_kind kind, int stage = -1);
 
 // Monotonically increasing counter. Incremented whenever the AMR grid

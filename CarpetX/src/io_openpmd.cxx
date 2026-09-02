@@ -1,6 +1,7 @@
 #include "io_openpmd.hxx"
 
 #include "driver.hxx"
+#include "fillpatch.hxx"
 #include "io_meta.hxx"
 #include "io_slice.hxx"
 #include "timer.hxx"
@@ -1105,20 +1106,21 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
                   []() { return "read from openPMD file"; });
           } // for tl
 
-          // Subcycling consumer bands (see OutputOpenPMD): zero-ghost MultiFabs
-          // sharing the level's idomain frame. Guard on mesh existence so
-          // synchronized/old checkpoints leave the rebuilt band untouched.
+          // Subcycling source history and accepted boundary snapshot (see
+          // OutputOpenPMD). Guard on mesh existence so synchronized and legacy
+          // checkpoints leave the rebuilt bands explicitly marked unrestored.
           {
             const auto read_band = [&](amrex::MultiFab *const band,
-                                       const band_kind kind, const int stage) {
+                                       const band_kind kind,
+                                       const int stage) -> bool {
               if (!band || band->empty())
-                return;
+                return false;
               assert(band->nGrowVect() == 0);
               const std::string band_tag = subcycling_band_tag(kind, stage);
               const std::string meshname = make_meshname(
                   gi, leveldata.patch, leveldata.level, 0, band_tag);
               if (!read_iter->meshes.count(meshname))
-                return; // old/synchronized checkpoint: no band data
+                return false;
               if (io_verbose)
                 CCTK_VINFO("Reading band mesh %s...", meshname.c_str());
               const openPMD::Mesh &mesh = read_iter->meshes.at(meshname);
@@ -1167,13 +1169,21 @@ void carpetx_openpmd_t::InputOpenPMD(const cGH *const cctkGH,
 #endif
                 } // for vi
               } // for local_component
+              return true;
             };
 
+            bool have_sources = groupdata.old_source_band != nullptr;
+            if (groupdata.old_source_band)
+              have_sources &= read_band(groupdata.old_source_band.get(),
+                                        band_kind::old_source, -1);
             for (int s = 0; s < max_num_rk_stages; ++s)
-              read_band(groupdata.ks_consumer_band[s].get(),
-                        band_kind::ks_consumer, s);
-            read_band(groupdata.old_consumer_band.get(),
-                      band_kind::old_consumer, -1);
+              if (groupdata.ks_source_band[s])
+                have_sources &= read_band(groupdata.ks_source_band[s].get(),
+                                          band_kind::ks_source, s);
+            groupdata.recovered_source_bands = have_sources;
+            groupdata.recovered_accepted_consumer_band = read_band(
+                groupdata.dense_consumer_band.get(),
+                band_kind::accepted_consumer, -1);
           }
         }
       } // for gi
@@ -1904,12 +1914,18 @@ void carpetx_openpmd_t::OutputOpenPMD(const cGH *const cctkGH,
             } // for local_component
           } // for tl
 
-          // Subcycling consumer bands: zero-ghost MultiFabs in this level's
-          // index space, so they share the level's idomain frame and dataset
-          // extent and write a sparse subset of chunks. Geometry is rebuilt on
-          // recovery; we serialize only the data, namespaced by a band tag.
-          // 2D slices emit only the main grid data; bands remain 3D-only.
+          // At an asynchronous checkpoint, preserve the parent source history
+          // used by D1's source-first dense construction and an accepted
+          // post-PostStep snapshot of each fine coarse-fine boundary. The
+          // latter is gathered here, after all evolution/projection work at
+          // this iteration has completed. 2D slices remain main-grid-only.
           if (write_bands && !slice) {
+            if (groupdata.dense_consumer_band)
+              SnapshotCoarseFineStateToBand(
+                  groupdata, *groupdata.dense_consumer_band,
+                  *groupdata.mfab.at(0),
+                  patchdata.amrcore->Geom(leveldata.level));
+
             const auto write_band = [&](const amrex::MultiFab *const band,
                                         const band_kind kind, const int stage) {
               if (!band || band->empty())
@@ -1990,10 +2006,12 @@ void carpetx_openpmd_t::OutputOpenPMD(const cGH *const cctkGH,
             };
 
             for (int s = 0; s < max_num_rk_stages; ++s)
-              write_band(groupdata.ks_consumer_band[s].get(),
-                         band_kind::ks_consumer, s);
-            write_band(groupdata.old_consumer_band.get(),
-                       band_kind::old_consumer, -1);
+              write_band(groupdata.ks_source_band[s].get(),
+                         band_kind::ks_source, s);
+            write_band(groupdata.old_source_band.get(),
+                       band_kind::old_source, -1);
+            write_band(groupdata.dense_consumer_band.get(),
+                       band_kind::accepted_consumer, -1);
           } // if write_bands
         }
       } // for gi

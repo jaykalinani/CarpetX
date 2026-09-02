@@ -338,4 +338,26 @@ void FillPatch_ProlongateToBand(
                   mapper, bcrecs, 0);
 }
 
+void SnapshotCoarseFineStateToBand(
+    const GHExt::PatchData::LevelData::GroupData &groupdata,
+    MultiFab &consumer_band, const MultiFab &state, const Geometry &geom) {
+  assert(consumer_band.ixType() == state.ixType());
+  assert(consumer_band.nComp() == groupdata.numvars);
+  assert(state.nComp() == groupdata.numvars);
+  assert(consumer_band.nGrowVect() == IntVect{0});
+
+  const IntVect state_ng(groupdata.nghostzones[0], groupdata.nghostzones[1],
+                         groupdata.nghostzones[2]);
+  assert(state.nGrowVect().allGE(state_ng));
+
+  // Consumer-band boxes contain a common interpolation footprint and may
+  // include padding outside the policy mask. Zeroing first keeps that padding
+  // deterministic; ParallelCopy then gathers both valid points and allocated
+  // ghosts from the current per-level state.
+  consumer_band.setVal(0.0);
+  consumer_band.ParallelCopy(state, 0, 0, groupdata.numvars, state_ng,
+                             IntVect{0}, geom.periodicity());
+  Gpu::synchronize();
+}
+
 } // namespace CarpetX

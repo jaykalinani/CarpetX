@@ -70,6 +70,14 @@ void FillPatch_ProlongateToBand(
     const amrex::Geometry &fgeom, const amrex::Geometry &cgeom,
     amrex::Interpolater *mapper, const amrex::Vector<amrex::BCRec> &bcrecs);
 
+// Snapshot the current fine state over the common coarse-fine consumer-band
+// footprint. Only mask-selected CF ghosts are consumed during recovery; the
+// rectangular band's remaining padding is initialized deterministically.
+void SnapshotCoarseFineStateToBand(
+    const GHExt::PatchData::LevelData::GroupData &groupdata,
+    amrex::MultiFab &consumer_band, const amrex::MultiFab &state,
+    const amrex::Geometry &geom);
+
 #warning "TODO: Restrict"
 
 // Prolongate and sync interior. Expects coarse mfab prolongated and

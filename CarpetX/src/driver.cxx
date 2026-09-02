@@ -1260,12 +1260,17 @@ bool all_levels_synchronized() {
 std::string subcycling_band_tag(const band_kind kind, const int stage) {
   std::ostringstream buf;
   switch (kind) {
-  case band_kind::ks_consumer:
+  case band_kind::ks_source:
     assert(stage >= 0 && stage < max_num_rk_stages);
-    buf << "ksc_s" << std::setw(2) << std::setfill('0') << stage;
+    buf << "kss_s" << std::setw(2) << std::setfill('0') << stage;
     break;
-  case band_kind::old_consumer:
-    buf << "oldc";
+  case band_kind::old_source:
+    assert(stage == -1);
+    buf << "olds";
+    break;
+  case band_kind::accepted_consumer:
+    assert(stage == -1);
+    buf << "acceptedc";
     break;
   default:
     assert(0);

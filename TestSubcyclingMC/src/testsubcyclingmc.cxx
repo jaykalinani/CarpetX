@@ -239,7 +239,8 @@ extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
   constexpr CCTK_REAL band_value = 11;
   bool tested_fine_level = false;
 
-  CarpetX::active_levels->loop_serially([&](auto &leveldata) {
+  CarpetX::active_levels->loop_serially([&](GHExt::PatchData::LevelData
+                                                &leveldata) {
     const auto &untagged = *leveldata.groupdata.at(untagged_gi);
     const auto &tagged = *leveldata.groupdata.at(tagged_gi);
 

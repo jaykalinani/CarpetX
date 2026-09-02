@@ -39,6 +39,9 @@
 #include <utility>
 #include <vector>
 
+extern "C" void ApplyCartoonBoundary(CCTK_POINTER_TO_CONST cctkGH, CCTK_INT gi,
+                                     CCTK_INT tl);
+
 namespace CarpetX {
 
 // Global variables
@@ -113,6 +116,8 @@ std::ostream &operator<<(std::ostream &os, const boundary_t boundary) {
     return os << "neumann";
   case boundary_t::robin:
     return os << "robin";
+  case boundary_t::cartoon:
+    return os << "cartoon";
   default:
     assert(0);
   }
@@ -222,11 +227,23 @@ std::array<std::array<boundary_t, dim>, 2> get_default_boundaries() {
           bool(CCTK_EQUALS(boundary_upper_z, "robin")),
       }},
   }};
+  const std::array<std::array<bool, 3>, 2> is_cartoon{{
+      {{
+          bool(CCTK_EQUALS(boundary_x, "cartoon")),
+          bool(CCTK_EQUALS(boundary_y, "cartoon")),
+          bool(CCTK_EQUALS(boundary_z, "cartoon")),
+      }},
+      {{
+          bool(CCTK_EQUALS(boundary_upper_x, "cartoon")),
+          bool(CCTK_EQUALS(boundary_upper_y, "cartoon")),
+          bool(CCTK_EQUALS(boundary_upper_z, "cartoon")),
+      }},
+  }};
   for (int f = 0; f < 2; ++f)
     for (int d = 0; d < dim; ++d)
       assert(is_symmetry[f][d] + is_dirichlet[f][d] +
                  is_linear_extrapolation[f][d] + is_neumann[f][d] +
-                 is_robin[f][d] <=
+                 is_robin[f][d] + is_cartoon[f][d] <=
              1);
 
   std::array<std::array<boundary_t, dim>, 2> boundaries;
@@ -238,6 +255,7 @@ std::array<std::array<boundary_t, dim>, 2> get_default_boundaries() {
                              ? boundary_t::linear_extrapolation
                          : is_neumann[f][d] ? boundary_t::neumann
                          : is_robin[f][d]   ? boundary_t::robin
+                         : is_cartoon[f][d] ? boundary_t::cartoon
                                             : boundary_t::none;
 
   return boundaries;
@@ -1157,6 +1175,14 @@ bool GHExt::PatchData::LevelData::GroupData::
   return res;
 }
 
+bool GHExt::PatchData::LevelData::GroupData::has_cartoon_boundary() const {
+  for (int f = 0; f < 2; ++f)
+    for (int d = 0; d < dim; ++d)
+      if (boundaries.at(f).at(d) == boundary_t::cartoon)
+        return true;
+  return false;
+}
+
 void GHExt::PatchData::LevelData::GroupData::apply_boundary_conditions(
     amrex::MultiFab &mfab) const {
   DECLARE_CCTK_PARAMETERS;
@@ -1188,6 +1214,26 @@ void GHExt::PatchData::LevelData::GroupData::apply_boundary_conditions(
     if (!gdomain.contains(dest.box()))
       BoundaryCondition(*this, dest).apply();
   }
+
+  // Cartoon is a physical BC on live grid functions, not on
+  // prolongation temporaries. Fill the timelevel that owns this mfab.
+  if (!has_cartoon_boundary())
+    return;
+  int tl = -1;
+  for (int t = 0; t < int(this->mfab.size()); ++t) {
+    if (this->mfab.at(t).get() == &mfab) {
+      tl = t;
+      break;
+    }
+  }
+  if (tl < 0)
+    return;
+  if (!CCTK_IsFunctionAliased("ApplyCartoonBoundary"))
+    CCTK_VERROR("CarpetX boundary condition \"cartoon\" requires thorn "
+                "Cartoon2DX to be active");
+  const auto &leveldata = ghext->patchdata.at(patch).leveldata.at(level);
+  for (int c = 0; c < int(leveldata.local_cctkGHs.size()); ++c)
+    ::ApplyCartoonBoundary(leveldata.get_local_cctkGH(c), groupindex, tl);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

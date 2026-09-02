@@ -8,6 +8,7 @@ SCHEDULE TestSubcyclingMC_Initial AT initial
 {
   LANG: C
   WRITES: ustate(interior)
+  WRITES: cf_ownership_untagged(interior) cf_ownership_tagged(interior)
   SYNC: ustate
 } "Initialize scalar wave state"
 
@@ -18,12 +19,16 @@ if (test_cf_ownership) {
     OPTIONS: global
   } "Verify tagged staggered dense-band ownership at refinement boundaries"
 
-  SCHEDULE TestSubcyclingMC_CFOwnershipRHS IN ODESolvers_RHS
-  {
-    LANG: C
-    WRITES: cf_ownership_untagged_rhs(interior) cf_ownership_tagged_rhs(interior)
-  } "Keep the coarse-fine ownership test fields stationary"
 }
+
+# The RHS tags are unconditional interface metadata. Keep their writer
+# unconditional as well so activating this test thorn alongside ODESolvers is
+# valid even when the optional ownership assertion is disabled.
+SCHEDULE TestSubcyclingMC_CFOwnershipRHS IN ODESolvers_RHS
+{
+  LANG: C
+  WRITES: cf_ownership_untagged_rhs(interior) cf_ownership_tagged_rhs(interior)
+} "Keep the coarse-fine ownership test fields stationary"
 
 SCHEDULE TestSubcyclingMC_Sync AT postregrid
 {

@@ -91,6 +91,16 @@ extern "C" void TestSubcyclingMC_Initial(CCTK_ARGUMENTS) {
   } else {
     CCTK_ERROR("Unknown initial condition");
   }
+
+  // These groups always declare ODE RHS metadata. Initialize them regardless
+  // of whether the optional ownership assertion is enabled so the thorn also
+  // remains a valid ODESolvers client in its default parameter configuration.
+  grid.loop_int_device<1, 0, 0>(
+      grid.nghostzones,
+      [=] CCTK_DEVICE(const Loop::PointDesc &p) CCTK_ATTRIBUTE_ALWAYS_INLINE {
+        cf_untagged(p.I) = 0;
+        cf_tagged(p.I) = 0;
+      });
 }
 
 /**

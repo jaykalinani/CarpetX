@@ -224,6 +224,8 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
           stage, double(cctkGH->cctk_time));
     const int s = stage - 1;
     active_levels->loop_coarse_to_fine([&](const auto &restrict leveldata) {
+      const auto &patchdata = ghext->patchdata.at(leveldata.patch);
+      const auto &geom = patchdata.amrcore->Geom(leveldata.level);
       // rhs_groups[i] and var_groups[i] are paired by sort order.
       for (size_t i = 0; i < rhs_groups.size(); ++i) {
         const auto &rhs_groupdata = *leveldata.groupdata.at(rhs_groups[i]);
@@ -241,7 +243,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
         // interior cells, so the old same-level FillBoundary is unnecessary.
         src_band.ParallelCopy(rhs_mf, 0, 0, src_band.nComp(), amrex::IntVect{0},
                               amrex::IntVect{0},
-                              amrex::Periodicity::NonPeriodic());
+                              geom.periodicity());
       }
     });
     synchronize();
@@ -251,6 +253,8 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   // but from var(tl=0) once per step. The finest level has no source band.
   const auto fill_old_source_band = [&]() {
     active_levels->loop_coarse_to_fine([&](const auto &restrict leveldata) {
+      const auto &patchdata = ghext->patchdata.at(leveldata.patch);
+      const auto &geom = patchdata.amrcore->Geom(leveldata.level);
       for (const int gi : var_groups) {
         const auto &groupdata = *leveldata.groupdata.at(gi);
         if (!groupdata.old_source_band)
@@ -261,7 +265,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
         assert(src_band.nComp() == var_mf.nComp());
         src_band.ParallelCopy(var_mf, 0, 0, src_band.nComp(), amrex::IntVect{0},
                               amrex::IntVect{0},
-                              amrex::Periodicity::NonPeriodic());
+                              geom.periodicity());
       }
     });
     synchronize();

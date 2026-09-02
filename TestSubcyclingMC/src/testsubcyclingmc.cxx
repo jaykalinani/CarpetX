@@ -1,4 +1,5 @@
 #include <loop_device.hxx>
+#include <subcycling.hxx>
 #include <subcycling_legacy.hxx>
 
 #include <sum.hxx>
@@ -9,6 +10,9 @@
 #include <cctk.h>
 #include <cctk_Arguments.h>
 #include <cctk_Parameters.h>
+
+#include <AMReX_MFIter.H>
+#include <AMReX_iMultiFab.H>
 
 #include <array>
 #include <cassert>
@@ -204,8 +208,173 @@ extern "C" void TestSubcyclingMC_WarmCFMask(CCTK_ARGUMENTS) {
   assert(CarpetX::active_levels);
   CarpetX::active_levels->loop_serially([&](const auto &restrict leveldata) {
     const auto &gd = *leveldata.groupdata.at(gi);
-    leveldata.build_cf_mask(gd.indextype, gd.nghostzones);
+    leveldata.build_cf_mask(
+        gd.indextype, gd.nghostzones,
+        gd.subcycling_prescribe_valid_cf_interface);
   });
+}
+
+extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
+  if (!ghext->use_subcycling || ghext->num_levels() < 2)
+    return;
+
+  const int untagged_gi =
+      CCTK_GroupIndex("TestSubcyclingMC::cf_ownership_untagged");
+  const int tagged_gi =
+      CCTK_GroupIndex("TestSubcyclingMC::cf_ownership_tagged");
+  assert(untagged_gi >= 0 && tagged_gi >= 0);
+  assert(CarpetX::active_levels);
+
+  constexpr CCTK_REAL sentinel = -7;
+  constexpr CCTK_REAL band_value = 11;
+  bool tested_fine_level = false;
+
+  CarpetX::active_levels->loop_serially([&](auto &leveldata) {
+    const auto &untagged = *leveldata.groupdata.at(untagged_gi);
+    const auto &tagged = *leveldata.groupdata.at(tagged_gi);
+
+    if (untagged.subcycling_prescribe_valid_cf_interface ||
+        !tagged.subcycling_prescribe_valid_cf_interface)
+      CCTK_VERROR("Incorrect parsed coarse-fine ownership policy");
+    if (untagged.indextype != tagged.indextype ||
+        untagged.nghostzones != tagged.nghostzones)
+      CCTK_VERROR("Ownership test groups do not have identical layouts");
+
+    leveldata.build_cf_mask(
+        untagged.indextype, untagged.nghostzones,
+        untagged.subcycling_prescribe_valid_cf_interface);
+    leveldata.build_cf_mask(tagged.indextype, tagged.nghostzones,
+                            tagged.subcycling_prescribe_valid_cf_interface);
+    leveldata.build_bands(untagged);
+    leveldata.build_bands(tagged);
+
+    if (leveldata.level == 0)
+      return;
+    tested_fine_level = true;
+
+    auto *const untagged_mask = leveldata.get_cf_mask(
+        untagged.indextype, untagged.nghostzones,
+        untagged.subcycling_prescribe_valid_cf_interface);
+    auto *const tagged_mask = leveldata.get_cf_mask(
+        tagged.indextype, tagged.nghostzones,
+        tagged.subcycling_prescribe_valid_cf_interface);
+    assert(untagged_mask && tagged_mask);
+
+    auto &untagged_dst = *untagged.mfab.at(0);
+    auto &tagged_dst = *tagged.mfab.at(0);
+    auto *const untagged_band = untagged.ks_consumer_band.at(0).get();
+    auto *const tagged_band = tagged.ks_consumer_band.at(0).get();
+    if (!untagged_band || !tagged_band)
+      CCTK_VERROR("Ownership test has no coarse-fine consumer band");
+
+    assert(untagged_dst.boxArray() == tagged_dst.boxArray());
+    assert(untagged_dst.DistributionMap() == tagged_dst.DistributionMap());
+    assert(untagged_mask->boxArray() == untagged_dst.boxArray());
+    assert(tagged_mask->boxArray() == tagged_dst.boxArray());
+    assert(untagged_band->boxArray() == tagged_band->boxArray());
+    assert(untagged_band->DistributionMap() == tagged_band->DistributionMap());
+
+    const amrex::IntVect ng(untagged.nghostzones[0],
+                            untagged.nghostzones[1],
+                            untagged.nghostzones[2]);
+    untagged_dst.setVal(sentinel, ng);
+    tagged_dst.setVal(sentinel, ng);
+    untagged_band->setVal(band_value);
+    tagged_band->setVal(band_value);
+
+    Subcycling::ScatterBandToCoarseFineGhosts(
+        leveldata, untagged, untagged_dst, *untagged_band);
+    Subcycling::ScatterBandToCoarseFineGhosts(leveldata, tagged, tagged_dst,
+                                               *tagged_band);
+    amrex::Gpu::synchronize();
+
+    enum check_t {
+      ordinary_points,
+      interface_points,
+      mask_errors,
+      untagged_scatter_errors,
+      tagged_scatter_errors,
+      lower_y_points,
+      upper_y_points,
+      lower_z_points,
+      upper_z_points,
+      num_checks
+    };
+    amrex::iMultiFab checks(untagged_dst.boxArray(),
+                            untagged_dst.DistributionMap(), num_checks, ng);
+    checks.setVal(0, ng);
+
+    for (amrex::MFIter mfi(checks); mfi.isValid(); ++mfi) {
+      const amrex::Box valid = mfi.validbox();
+      const amrex::Box grown = amrex::grow(valid, ng);
+      const auto untagged_mask_arr = untagged_mask->const_array(mfi);
+      const auto tagged_mask_arr = tagged_mask->const_array(mfi);
+      const auto untagged_arr = untagged_dst.const_array(mfi);
+      const auto tagged_arr = tagged_dst.const_array(mfi);
+      const auto check_arr = checks.array(mfi);
+      const auto lo = amrex::lbound(valid);
+      const auto hi = amrex::ubound(valid);
+
+      amrex::ParallelFor(
+          grown, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+            const int untagged_mask_value = untagged_mask_arr(i, j, k);
+            const int tagged_mask_value = tagged_mask_arr(i, j, k);
+            const bool ordinary = untagged_mask_value != 0;
+            const bool inside = i >= lo.x && i <= hi.x && j >= lo.y &&
+                                j <= hi.y && k >= lo.z && k <= hi.z;
+
+            // The test fields are CVV: only the y and z directions are nodal.
+            // An interface point is a valid point with a real coarse-fine
+            // ghost immediately outside the corresponding valid face.
+            const bool lower_y =
+                inside && j == lo.y && untagged_mask_arr(i, j - 1, k) != 0;
+            const bool upper_y =
+                inside && j == hi.y && untagged_mask_arr(i, j + 1, k) != 0;
+            const bool lower_z =
+                inside && k == lo.z && untagged_mask_arr(i, j, k - 1) != 0;
+            const bool upper_z =
+                inside && k == hi.z && untagged_mask_arr(i, j, k + 1) != 0;
+            const bool interface = lower_y || upper_y || lower_z || upper_z;
+            const bool expected_tagged = ordinary || interface;
+
+            check_arr(i, j, k, ordinary_points) = ordinary;
+            check_arr(i, j, k, interface_points) = interface;
+            check_arr(i, j, k, mask_errors) =
+                (tagged_mask_value != 0) != expected_tagged;
+            check_arr(i, j, k, untagged_scatter_errors) =
+                untagged_arr(i, j, k) !=
+                (ordinary ? band_value : sentinel);
+            check_arr(i, j, k, tagged_scatter_errors) =
+                tagged_arr(i, j, k) !=
+                (expected_tagged ? band_value : sentinel);
+            check_arr(i, j, k, lower_y_points) = lower_y;
+            check_arr(i, j, k, upper_y_points) = upper_y;
+            check_arr(i, j, k, lower_z_points) = lower_z;
+            check_arr(i, j, k, upper_z_points) = upper_z;
+          });
+    }
+    amrex::Gpu::synchronize();
+
+    const auto &checks_base =
+        static_cast<const amrex::FabArray<amrex::IArrayBox> &>(checks);
+    std::array<amrex::Long, num_checks> sums;
+    for (int n = 0; n < num_checks; ++n)
+      sums[n] = checks_base.sum(n, ng);
+
+    if (sums[ordinary_points] == 0 || sums[interface_points] == 0)
+      CCTK_VERROR("Ownership test did not encounter a coarse-fine boundary");
+    if (sums[lower_y_points] == 0 || sums[upper_y_points] == 0 ||
+        sums[lower_z_points] == 0 || sums[upper_z_points] == 0)
+      CCTK_VERROR("Ownership test did not cover every CVV interface face");
+    if (sums[mask_errors] != 0)
+      CCTK_VERROR("Tagged coarse-fine ownership mask is incorrect");
+    if (sums[untagged_scatter_errors] != 0 ||
+        sums[tagged_scatter_errors] != 0)
+      CCTK_VERROR("Dense-band ownership scatter wrote incorrect points");
+  });
+
+  if (!tested_fine_level)
+    CCTK_VERROR("Ownership test did not visit a fine level");
 }
 
 extern "C" void TestSubcyclingMC_SetP(CCTK_ARGUMENTS) {

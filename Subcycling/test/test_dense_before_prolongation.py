@@ -243,6 +243,7 @@ def check_checkpoint_contract():
     fillpatch = (repo / "CarpetX/src/fillpatch.cxx").read_text()
     openpmd = (repo / "CarpetX/src/io_openpmd.cxx").read_text()
     silo = (repo / "CarpetX/src/io_silo.cxx").read_text()
+    io_driver = (repo / "CarpetX/src/io.cxx").read_text()
 
     # The schema stores source-space constituents, never independently
     # prolonged constituents, plus one accepted boundary snapshot.
@@ -250,20 +251,56 @@ def check_checkpoint_contract():
         assert token in header
         assert token in driver
         assert f"band_kind::{token}" in openpmd
-        assert f"band_kind::{token}" in silo
     for obsolete in ("band_kind::ks_consumer", "band_kind::old_consumer"):
         assert obsolete not in openpmd
         assert obsolete not in silo
 
     # The boundary snapshot is gathered from the actual tl=0 state at output
     # time, after PostStep, rather than re-created from temporal constituents.
-    for backend in (openpmd, silo):
-        snapshot = backend.index("SnapshotCoarseFineStateToBand")
-        write_accepted = backend.index("band_kind::accepted_consumer", snapshot)
-        assert snapshot < write_accepted
-        assert "*groupdata.mfab.at(0)" in backend[snapshot:write_accepted]
+    snapshot = openpmd.index("SnapshotCoarseFineStateToBand")
+    write_accepted = openpmd.index("band_kind::accepted_consumer", snapshot)
+    assert snapshot < write_accepted
+    assert "*groupdata.mfab.at(0)" in openpmd[snapshot:write_accepted]
     assert fillpatch.index("consumer_band.setVal(0.0)") \
         < fillpatch.index("consumer_band.ParallelCopy")
+
+    # Each band has its own integer/physical frame. In particular, periodic
+    # source footprints outside the level domain must not underflow an offset
+    # expressed relative to idomain.
+    read_band = openpmd[openpmd.index("const auto read_band"):
+                        openpmd.index("bool have_sources")]
+    write_band = openpmd[openpmd.index("const auto write_band"):
+                         openpmd.index("for (int s = 0; s < max_num_rk_stages",
+                                       openpmd.index("const auto write_band"))]
+    for implementation in (read_band, write_band):
+        assert "boxArray().minimalBox()" in implementation
+        assert "box.lo - band_lo" in implementation
+        assert "box.lo - idomain.lo" not in implementation
+    for token in ("band_dataset", "band_x0", "expected_extent",
+                  "int(mesh.size()) != numvars"):
+        assert token in openpmd
+
+    # A partial epoch, a changed integrator, or a changed coarse timestep is
+    # rejected instead of being silently interpreted as another RK history.
+    for token in ("subcycling_band_schema_version",
+                  "subcycling_manifest_attr", "subcycling_method_attr",
+                  "subcycling_stages_attr", "subcycling_dt_attr",
+                  "stored_manifest != expected_manifest",
+                  "checkpoint_method != current_method",
+                  "checkpoint_stages != ghext->num_rk_stages"):
+        assert token in openpmd
+    recovery = (repo / "ODESolvers/src/odesolvers_solve_subcycling.cxx").read_text()
+    assert "recovered_subcycling_delta_time != cctk_delta_time" in recovery
+
+    # Per-level clocks are all-or-none, and Silo is rejected for an in-flight
+    # epoch until every staggered centering has a complete backend contract.
+    assert "have_iter_num != have_iter_den" in openpmd
+    assert "levels_with_iteration != total_levels" in openpmd
+    assert "have_iter_num != have_iter_den" in silo
+    assert "levels_with_iteration != total_levels" in silo
+    assert io_driver.count("Exact asynchronous subcycling") >= 2
+    assert 'checkpoint_method=\\"openpmd\\"' in io_driver
+    assert 'recover_method=\\"openpmd\\"' in io_driver
     print("checkpoint wiring: source history + accepted ghost snapshot pass")
 
 

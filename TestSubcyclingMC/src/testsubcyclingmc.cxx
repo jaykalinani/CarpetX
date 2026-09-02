@@ -387,6 +387,17 @@ extern "C" void TestSubcyclingMC_TestCFOwnership(CCTK_ARGUMENTS) {
     CCTK_VERROR("Ownership test did not visit a fine level");
 }
 
+extern "C" void TestSubcyclingMC_CFOwnershipRHS(CCTK_ARGUMENTS) {
+  DECLARE_CCTK_ARGUMENTSX_TestSubcyclingMC_CFOwnershipRHS;
+
+  grid.loop_int_device<1, 0, 0>(
+      grid.nghostzones,
+      [=] CCTK_DEVICE(const Loop::PointDesc &p) CCTK_ATTRIBUTE_ALWAYS_INLINE {
+        cf_untagged_rhs(p.I) = 0;
+        cf_tagged_rhs(p.I) = 0;
+      });
+}
+
 extern "C" void TestSubcyclingMC_SetP(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTSX_TestSubcyclingMC_SetP;
 

@@ -1,6 +1,7 @@
 # Schedule definitions for thorn TestSubcyclingMC
 
 STORAGE: ustate pstate k1 k2 k3 k4 error cf_ownership_untagged cf_ownership_tagged
+STORAGE: cf_ownership_untagged_rhs cf_ownership_tagged_rhs
 
 
 SCHEDULE TestSubcyclingMC_Initial AT initial
@@ -16,6 +17,12 @@ if (test_cf_ownership) {
     LANG: C
     OPTIONS: global
   } "Verify tagged staggered dense-band ownership at refinement boundaries"
+
+  SCHEDULE TestSubcyclingMC_CFOwnershipRHS IN ODESolvers_RHS
+  {
+    LANG: C
+    WRITES: cf_ownership_untagged_rhs(interior) cf_ownership_tagged_rhs(interior)
+  } "Keep the coarse-fine ownership test fields stationary"
 }
 
 SCHEDULE TestSubcyclingMC_Sync AT postregrid

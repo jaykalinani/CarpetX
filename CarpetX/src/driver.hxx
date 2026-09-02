@@ -154,6 +154,10 @@ struct GHExt {
 
     bool do_checkpoint; // whether to checkpoint
     bool do_evolve;     // whether this is an evolved state variable
+    // True only for a grid-function group with a nonempty ODESolvers `rhs`
+    // tag. `do_evolve` has broader checkpoint/timelevel semantics and must not
+    // select temporal subcycling bands.
+    bool has_ode_rhs = false;
     bool do_restrict;   // whether to restrict
 
     std::vector<std::vector<why_valid_t> > valid; // [time level][var index]

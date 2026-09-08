@@ -1341,7 +1341,11 @@ int Initialise(tFleshConfig *config) {
           patchdata.amrcore->level_modified.clear();
           patchdata.amrcore->level_modified.resize(old_numlevels, false);
           const CCTK_REAL time = 0; // dummy time
-          patchdata.amrcore->regrid(0, time);
+          // Initial hierarchy construction adds one level per pass. Keeping
+          // existing levels fixed avoids rebuilding and projecting the full
+          // hierarchy whenever a new finest level is added.
+          const int regrid_base_level = old_numlevels - 1;
+          patchdata.amrcore->regrid(regrid_base_level, time);
 
           const int new_numlevels = patchdata.amrcore->finestLevel() + 1;
           const int max_numlevels = patchdata.amrcore->maxLevel() + 1;

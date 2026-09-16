@@ -411,6 +411,16 @@ CCTK_REAL regrid_error_threshold "Regridding error threshold" STEERABLE=always
   0.0:* :: ""
 } 1.0
 
+CCTK_INT tag_buffer_size "Number of level-local cells added around each tagged cell"
+{
+  0:* :: ""
+} 1
+
+CCTK_INT grid_buffer_size "Minimum number of level-local cells enforced for proper nesting"
+{
+  1:* :: ""
+} 1
+
 
 
 CCTK_INT ghost_size "Number of ghost zones"

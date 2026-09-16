@@ -1,0 +1,36 @@
+BHClusterTagging
+================
+
+This thorn supplies CarpetX's `EstimateError` routine with the tagging
+criterion used by GRChombo's
+`ImprovedChiPunctureExtractionTaggingCriterion`.
+
+It tags:
+
+* spherical regions around configured extraction radii until each radius has
+  its requested refinement level; and
+* nested cubical regions around the effective puncture groups exported by
+  PunctureTracker.
+
+PunctureTracker controls whether nearby punctures are grouped and the
+mass-scaled distance used to identify mergers.  Its group positions are
+mass-weighted and its group masses are sums of puncture masses, matching the
+GRChombo TrackMergers input to the criterion.
+
+Important parameters are `extraction_radii`, `extraction_levels`,
+`minimum_horizon_points`, `bh_margin_factor`, and `num_nested_levels`.
+Refinement levels are zero based: requesting extraction level N tags levels
+0 through N-1.
+
+For tagging diagnostics, set `BHClusterTagging::verbose = yes`. The thorn
+then writes the PunctureTracker counts, each puncture's group/mass/position,
+and every reconstructed tagging group once per `verbose_every` Cactus
+iterations (default: every iteration).
+
+For distributed tagging diagnostics, additionally set
+`BHClusterTagging::verbose_rank_inputs = yes` and
+`BHClusterTagging::verbose_coverage = yes`. The first emits a compact input
+fingerprint on every MPI rank; the second emits each local AMR component's
+union tag count and nonzero per-group tag counts before AMReX clusters the
+tags into boxes. Both use `verbose_every` as their reporting interval.
+

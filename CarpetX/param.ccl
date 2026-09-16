@@ -708,6 +708,22 @@ INT out_tsv_every "Output in TSV format every that many iterations" STEERABLE=al
   1:* :: "every that many iterations"
 } -1
 
+KEYWORD out_tsv_scalar_mode \
+  "File layout for TSV output of scalar groups" \
+  STEERABLE=always
+{
+  "iteration_files" :: "Write a separate file for every output iteration"
+  "append"          :: "Append all iterations to one file per group"
+} "iteration_files"
+
+KEYWORD out_tsv_spatial_mode \
+  "File layout for spatial TSV output, including array and grid-function slices" \
+  STEERABLE=always
+{
+  "iteration_files" :: "Write a separate file for every output iteration"
+  "append"          :: "Append all iterations to one file per group and direction"
+} "iteration_files"
+
 
 
 SHARES: Cactus

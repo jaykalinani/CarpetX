@@ -405,6 +405,15 @@ CCTK_INT regrid_every "Regridding interval" STEERABLE=always
   1:* :: "every that many iterations"
 } 0
 
+# Chombo-compatible, level-aware regridding. When BHClusterTagging is active
+# and at least one entry is nonzero, this takes precedence over regrid_every.
+# Entry l controls regridding from level l through the finest level after this
+# many completed level-l steps; the finest-level entry is ignored.
+CCTK_INT regrid_intervals[20] "Per-level regridding intervals" STEERABLE=always
+{
+  0:* :: "0 disables regridding from this level"
+} 0
+
 #TODO: eliminate in favor of regrid_error being a true/false field
 CCTK_REAL regrid_error_threshold "Regridding error threshold" STEERABLE=always
 {

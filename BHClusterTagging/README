@@ -22,6 +22,28 @@ Important parameters are `extraction_radii`, `extraction_levels`,
 Refinement levels are zero based: requesting extraction level N tags levels
 0 through N-1.
 
+When this thorn is active, CarpetX constructs the fresh hierarchy by
+regridding from level zero. This lets AMReX cluster the BH-cluster tags and
+project its resulting fine boxes back through the parent levels with the
+configured proper-nesting buffer, analogous to Chombo's MeshRefine pass. The
+complete hierarchy is built before `CCTK_POSTRESTRICTINITIAL`, where
+BHClusterX performs its nonlinear initial-data solve.
+
+For Chombo-style evolution regridding, set a nonzero
+`CarpetX::regrid_intervals` entry for each desired base level, for example:
+
+```
+CarpetX::regrid_intervals = [0, 0, 4, 4, 4, 4, 4, 8, 16]
+```
+
+Entry `l` counts completed level-`l` steps and triggers one AMReX regrid from
+level `l` through the finest level. A zero disables that base level; the
+finest-level entry is ignored. If more than one interval is due at the same
+time, the coarsest due level is used. With all entries zero, CarpetX retains
+its existing `regrid_every` behaviour. `CarpetX::tag_buffer_size` and
+`CarpetX::grid_buffer_size` continue to control AMReX's tag and
+proper-nesting buffers respectively.
+
 For tagging diagnostics, set `BHClusterTagging::verbose = yes`. The thorn
 then writes the PunctureTracker counts, each puncture's group/mass/position,
 and every reconstructed tagging group once per `verbose_every` Cactus
@@ -33,4 +55,3 @@ For distributed tagging diagnostics, additionally set
 fingerprint on every MPI rank; the second emits each local AMR component's
 union tag count and nonzero per-group tag counts before AMReX clusters the
 tags into boxes. Both use `verbose_every` as their reporting interval.
-

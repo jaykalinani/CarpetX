@@ -1128,6 +1128,11 @@ int Initialise(tFleshConfig *config) {
   cGH *restrict const cctkGH = CCTK_SetupGH(config, 0);
   CCTKi_AddGH(config, 0, cctkGH);
 
+  // Keep the recovery state available to thorns scheduled after the hierarchy
+  // is built. cctk_iteration alone cannot express it: an initial-data
+  // checkpoint is recovered at iteration zero.
+  ghext->recovered = config->recovered;
+
   // Check presync mode
   if (!CCTK_EQUALS(presync_mode, "mixed-error") &&
       !CCTK_EQUALS(presync_mode, "presync-only"))

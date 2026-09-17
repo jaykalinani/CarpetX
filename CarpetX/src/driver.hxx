@@ -538,6 +538,11 @@ struct GHExt {
 
   bool use_subcycling = false;
 
+  // True when this GH was constructed by checkpoint recovery. This is
+  // independent of cctk_iteration: an initial-data checkpoint is recovered at
+  // iteration zero.
+  bool recovered = false;
+
   // Active number of RK stages for subcycling, set from ODESolvers::method at
   // WRAGH (SSPRK3 -> 3, else 4). Must be <= max_num_rk_stages.
   int num_rk_stages = 4;

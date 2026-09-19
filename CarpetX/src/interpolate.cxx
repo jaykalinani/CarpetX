@@ -697,7 +697,6 @@ static void CarpetX_InterpolateAtMaxLevel(
 
   rat64 min_level_iteration_used = -1;
   rat64 max_level_iteration_used = -1;
-  bool requires_interpolation_in_time = false;
   for (const auto &patchdata : ghext->patchdata) {
     const int patch = patchdata.patch;
     for (const auto &leveldata : patchdata.leveldata) {
@@ -883,8 +882,12 @@ static void CarpetX_InterpolateAtMaxLevel(
                   MPI_MAX, comm);
     const double min_iteration_used = -global_iteration_used[0];
     const double max_iteration_used = +global_iteration_used[1];
-    // Did two (or one) ranks use different iterations?
-    if (max_iteration_used != min_iteration_used) {
+    // A collective interpolation may deliberately contain no points on any
+    // rank (e.g. AHFinderDirect dummy rounds for an unowned horizon). Both
+    // reductions then contain only the -infinity sentinel, so min > max.
+    // Nothing was interpolated in that case and no time alignment is needed.
+    if (min_iteration_used <= max_iteration_used &&
+        min_iteration_used != max_iteration_used) {
       CCTK_VERROR("Interpolation in time required when interpolating %s at "
                   "iteration %d",
                   nvars > 0 ? CCTK_FullVarName(varinds[0]) : "no variable",

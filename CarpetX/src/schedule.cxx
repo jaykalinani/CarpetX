@@ -105,6 +105,40 @@ int WidenMinLevel(int initial_min_level, rat64 target_iteration) {
   }
   return min_level;
 }
+
+// Return true iff every extant level from base_level through the finest one
+// has the same logical time. This is the subcycling-safe point at which AMReX
+// may remake levels above base_level without requiring time interpolation.
+bool levels_synchronized_from(const int base_level) {
+  std::optional<rat64> reference_iteration;
+  for (const auto &patchdata : ghext->patchdata) {
+    if (base_level >= int(patchdata.leveldata.size()))
+      return false;
+    for (int level = base_level; level < int(patchdata.leveldata.size());
+         ++level) {
+      const rat64 iteration = patchdata.leveldata.at(level).iteration;
+      if (!reference_iteration)
+        reference_iteration = iteration;
+      else if (iteration != *reference_iteration)
+        return false;
+    }
+  }
+  return bool(reference_iteration);
+}
+
+bool bhcluster_interval_regridding_enabled(const CCTK_INT *intervals) {
+  if (!CCTK_IsThornActive("BHClusterTagging"))
+    return false;
+  for (int level = 0; level < 20; ++level)
+    if (intervals[level] > 0)
+      return true;
+  return false;
+}
+
+void ensure_bhcluster_regrid_counters(const int nlevels) {
+  if (int(ghext->bhcluster_regrid_steps.size()) < nlevels)
+    ghext->bhcluster_regrid_steps.resize(nlevels, 0);
+}
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1094,6 +1128,11 @@ int Initialise(tFleshConfig *config) {
   cGH *restrict const cctkGH = CCTK_SetupGH(config, 0);
   CCTKi_AddGH(config, 0, cctkGH);
 
+  // Keep the recovery state available to thorns scheduled after the hierarchy
+  // is built. cctk_iteration alone cannot express it: an initial-data
+  // checkpoint is recovered at iteration zero.
+  ghext->recovered = config->recovered;
+
   // Check presync mode
   if (!CCTK_EQUALS(presync_mode, "mixed-error") &&
       !CCTK_EQUALS(presync_mode, "presync-only"))
@@ -1341,10 +1380,13 @@ int Initialise(tFleshConfig *config) {
           patchdata.amrcore->level_modified.clear();
           patchdata.amrcore->level_modified.resize(old_numlevels, false);
           const CCTK_REAL time = 0; // dummy time
-          // Initial hierarchy construction adds one level per pass. Keeping
-          // existing levels fixed avoids rebuilding and projecting the full
-          // hierarchy whenever a new finest level is added.
-          const int regrid_base_level = old_numlevels - 1;
+          // BoxInBox retains the upstream startup path: add one child while
+          // preserving the existing hierarchy. BHClusterTagging instead
+          // mirrors Chombo's MeshRefine pass: AMReX regrids from the base so
+          // its own clustered fine boxes are projected, buffered, and folded
+          // into the parent tags before the final initial-data solve.
+          const int regrid_base_level =
+              CCTK_IsThornActive("BHClusterTagging") ? 0 : old_numlevels - 1;
           patchdata.amrcore->regrid(regrid_base_level, time);
 
           const int new_numlevels = patchdata.amrcore->finestLevel() + 1;
@@ -1427,6 +1469,18 @@ int Initialise(tFleshConfig *config) {
   }
 #pragma omp critical
   CCTK_VINFO("Initialized %d levels", ghext->num_levels());
+
+  // Fresh initial hierarchies have not evolved. Regridding from level zero
+  // for BHClusterTagging can remake provisional levels, so establish the
+  // common t=0 logical iteration before the post-restriction initial-data
+  // solve and before any global interpolation-based operation.
+  if (!config->recovered) {
+    for (auto &patchdata : ghext->patchdata)
+      for (auto &leveldata : patchdata.leveldata)
+        leveldata.iteration = 0;
+    assert(all_levels_synchronized());
+  }
+  ghext->bhcluster_regrid_steps.assign(ghext->num_levels(), 0);
 
   assert(!active_levels);
   // Widen from the finest level so the range matches the one under which
@@ -1721,6 +1775,11 @@ int Evolve(tFleshConfig *config) {
   int average_iteration_time_iterations = 0;
   double average_iteration_time = 0;
 
+  const bool use_bhcluster_regrid_intervals =
+      bhcluster_interval_regridding_enabled(regrid_intervals);
+  if (use_bhcluster_regrid_intervals)
+    ensure_bhcluster_regrid_counters(ghext->num_levels());
+
   std::ofstream performance_file;
   if (out_performance && CCTK_MyProc(NULL) == 0) {
     const int every =
@@ -1748,8 +1807,31 @@ int Evolve(tFleshConfig *config) {
       for (const auto &leveldata : patchdata.leveldata)
         iteration = min(iteration, leveldata.iteration);
 
+    // Chombo's regrid_interval[l] counts completed steps on level l. When a
+    // coarse interval is due at the same synchronization point as a finer
+    // interval, regridding from the coarsest due level covers both ranges.
+    int interval_regrid_base_level = -1;
+    if (use_bhcluster_regrid_intervals) {
+      ensure_bhcluster_regrid_counters(ghext->num_levels());
+      for (int level = 0; level + 1 < ghext->num_levels(); ++level) {
+        if (regrid_intervals[level] > 0 &&
+            ghext->bhcluster_regrid_steps.at(level) >=
+                static_cast<unsigned long long>(regrid_intervals[level]) &&
+            levels_synchronized_from(level)) {
+          interval_regrid_base_level = level;
+          break;
+        }
+      }
+    }
+
+    const bool do_regrid =
+        use_bhcluster_regrid_intervals
+            ? interval_regrid_base_level >= 0
+            : (regrid_every > 0 &&
+               cctkGH->cctk_iteration % regrid_every == 0);
+
     // TODO: Move regridding into a function
-    if (regrid_every > 0 && cctkGH->cctk_iteration % regrid_every == 0) {
+    if (do_regrid) {
 #pragma omp critical
       CCTK_VINFO("Regridding...");
       static Timer timer("EvolveRegrid");
@@ -1757,14 +1839,18 @@ int Evolve(tFleshConfig *config) {
 
       for (const auto &patchdata : ghext->patchdata) {
 
-        int min_active_level = -1;
-        for (int level = patchdata.leveldata.size() - 1; level >= 0; --level) {
-          if (patchdata.leveldata.at(level).iteration != iteration) {
-            break;
+        int regrid_base_level = interval_regrid_base_level;
+        if (!use_bhcluster_regrid_intervals) {
+          regrid_base_level = -1;
+          for (int level = patchdata.leveldata.size() - 1; level >= 0;
+               --level) {
+            if (patchdata.leveldata.at(level).iteration != iteration) {
+              break;
+            }
+            regrid_base_level = level;
           }
-          min_active_level = level;
         }
-        assert(min_active_level != -1);
+        assert(regrid_base_level != -1);
 
         const int old_numlevels = patchdata.amrcore->finestLevel() + 1;
         patchdata.amrcore->level_modified.clear();
@@ -1790,7 +1876,7 @@ int Evolve(tFleshConfig *config) {
         }
         patchdata.amrcore->SetMaxGridSize(max_grid_sizes_vec);
 
-        patchdata.amrcore->regrid(min_active_level, time);
+        patchdata.amrcore->regrid(regrid_base_level, time);
 
         const int new_numlevels = patchdata.amrcore->finestLevel() + 1;
         const int max_numlevels = patchdata.amrcore->maxLevel() + 1;
@@ -1839,6 +1925,13 @@ int Evolve(tFleshConfig *config) {
       }
       const bool did_modify_any_level =
           last_modified_level >= first_modified_level;
+
+      if (use_bhcluster_regrid_intervals) {
+        ensure_bhcluster_regrid_counters(ghext->num_levels());
+        std::fill(ghext->bhcluster_regrid_steps.begin() +
+                      interval_regrid_base_level,
+                  ghext->bhcluster_regrid_steps.end(), 0);
+      }
 
       if (did_modify_any_level) {
         // Determine time step size
@@ -1916,6 +2009,9 @@ int Evolve(tFleshConfig *config) {
       // bootom of loop body
       active_levels = make_optional<active_levels_t>(min_level, max_level);
 
+      const int advanced_min_level = min_level;
+      const int advanced_max_level = max_level;
+
       // Advance iteration number on this batch of levels
       level_iteration += level_delta_iteration;
       active_levels->loop_serially([&](auto &restrict leveldata) {
@@ -1966,6 +2062,13 @@ int Evolve(tFleshConfig *config) {
 
       CCTK_Traverse(cctkGH, "CCTK_POSTSTEP");
       CCTK_Traverse(cctkGH, "CCTK_ANALYSIS");
+
+      if (use_bhcluster_regrid_intervals) {
+        ensure_bhcluster_regrid_counters(ghext->num_levels());
+        for (int level = advanced_min_level; level < advanced_max_level;
+             ++level)
+          ++ghext->bhcluster_regrid_steps.at(level);
+      }
     } // for min_level, max_level
 
     CCTK_Traverse(cctkGH, "CCTK_CHECKPOINT");

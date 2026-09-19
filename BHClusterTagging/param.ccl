@@ -1,0 +1,77 @@
+# Parameter definitions for thorn BHClusterTagging
+
+BOOLEAN activate_extraction "Tag regions needed for spherical extraction"
+{
+} "no"
+
+CCTK_INT num_extraction_radii "Number of active extraction radii"
+{
+  0:100 :: ""
+} 0
+
+CCTK_REAL extraction_radii[100] "Extraction radii"
+{
+  (0:* :: "positive radius"
+} 1.0
+
+CCTK_INT extraction_levels[100] "Desired zero-based refinement level at each extraction radius"
+{
+  0:* :: ""
+} 0
+
+CCTK_REAL extraction_center_x "x coordinate of the extraction centre"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL extraction_center_y "y coordinate of the extraction centre"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_REAL extraction_center_z "z coordinate of the extraction centre"
+{
+  *:* :: ""
+} 0.0
+
+CCTK_INT minimum_horizon_points "Minimum number of coarsest-grid points represented across a unit group mass"
+{
+  1:* :: ""
+} 40
+
+CCTK_REAL bh_margin_factor "Half-width of the innermost puncture-group tagging cube in units of group mass"
+{
+  (0:* :: ""
+} 1.5
+
+CCTK_INT num_nested_levels "Maximum number of factor-two expansions outside the innermost puncture grid"
+{
+  0:* :: ""
+} 2
+
+CCTK_INT minimum_level_needed "Minimum finest level requested around every puncture group"
+{
+  0:* :: ""
+} 0
+
+BOOLEAN use_inner_grids "Continue tagging the innermost group region up to CarpetX's finest possible level"
+{
+} "no"
+
+BOOLEAN verbose "Write PunctureTracker inputs and reconstructed groups used for tagging"
+{
+} "no"
+
+CCTK_INT verbose_every "Write tagging diagnostics every this many Cactus iterations when verbose=yes"
+{
+  1:* :: "positive iteration interval"
+} 1
+
+BOOLEAN verbose_rank_inputs "Write a compact PunctureTracker input fingerprint from every MPI rank"
+{
+} "no"
+
+BOOLEAN verbose_coverage "Write per-component, per-group counts of cells selected by the tagging criterion"
+{
+} "no"
+

@@ -1,6 +1,6 @@
 # Parameter definitions for thorn BoxInBox
 
-CCTK_INT num_regions "Number of refined regions"
+CCTK_INT num_regions "Number of refined regions" STEERABLE=RECOVER
 {
   0:100 :: ""
 } 0

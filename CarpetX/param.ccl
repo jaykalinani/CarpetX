@@ -405,11 +405,30 @@ CCTK_INT regrid_every "Regridding interval" STEERABLE=always
   1:* :: "every that many iterations"
 } 0
 
+# Chombo-compatible, level-aware regridding. When BHClusterTagging is active
+# and at least one entry is nonzero, this takes precedence over regrid_every.
+# Entry l controls regridding from level l through the finest level after this
+# many completed level-l steps; the finest-level entry is ignored.
+CCTK_INT regrid_intervals[20] "Per-level regridding intervals" STEERABLE=always
+{
+  0:* :: "0 disables regridding from this level"
+} 0
+
 #TODO: eliminate in favor of regrid_error being a true/false field
 CCTK_REAL regrid_error_threshold "Regridding error threshold" STEERABLE=always
 {
   0.0:* :: ""
 } 1.0
+
+CCTK_INT tag_buffer_size "Number of level-local cells added around each tagged cell"
+{
+  0:* :: ""
+} 1
+
+CCTK_INT grid_buffer_size "Minimum number of level-local cells enforced for proper nesting"
+{
+  1:* :: ""
+} 1
 
 
 
@@ -707,6 +726,22 @@ INT out_tsv_every "Output in TSV format every that many iterations" STEERABLE=al
   0 :: "never output TSV"
   1:* :: "every that many iterations"
 } -1
+
+KEYWORD out_tsv_scalar_mode \
+  "File layout for TSV output of scalar groups" \
+  STEERABLE=always
+{
+  "iteration_files" :: "Write a separate file for every output iteration"
+  "append"          :: "Append all iterations to one file per group"
+} "iteration_files"
+
+KEYWORD out_tsv_spatial_mode \
+  "File layout for spatial TSV output, including array and grid-function slices" \
+  STEERABLE=always
+{
+  "iteration_files" :: "Write a separate file for every output iteration"
+  "append"          :: "Append all iterations to one file per group and direction"
+} "iteration_files"
 
 
 

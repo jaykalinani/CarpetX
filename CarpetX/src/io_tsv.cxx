@@ -22,6 +22,13 @@
 
 namespace CarpetX {
 
+namespace {
+bool fileIsEmpty(const std::string &filename) {
+  std::ifstream file(filename, std::ios_base::binary | std::ios_base::ate);
+  return !file || file.tellg() == 0;
+}
+} // namespace
+
 void WriteTSVold(const cGH *restrict cctkGH, const std::string &filename,
                  int gi, const std::vector<std::string> &varnames) {
   std::ostringstream buf;
@@ -130,7 +137,7 @@ void OutputTSVold(const cGH *restrict cctkGH) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void WriteTSVScalars(const cGH *restrict cctkGH, const std::string &filename,
-                     const int gi) {
+                     const int gi, const bool append) {
   // Output only on root process
   if (CCTK_MyProc(nullptr) > 0)
     return;
@@ -145,25 +152,28 @@ void WriteTSVScalars(const cGH *restrict cctkGH, const std::string &filename,
     varnames.push_back(CCTK_VarName(arraygroupdata.firstvarindex + vi));
 
   const std::string sep = "\t";
-  std::ofstream file(filename);
+  const bool write_header = !append || fileIsEmpty(filename);
+  std::ofstream file(filename, append ? std::ios_base::app
+                                      : std::ios_base::out);
   // get more precision for floats, could also use
   // https://stackoverflow.com/a/30968371
   file << setprecision(std::numeric_limits<CCTK_REAL>::digits10 + 1)
        << scientific;
 
-  // Output header
-  file << "# 1:iteration" << sep << "2:time";
-  int col = 3;
-  for (const auto &varname : varnames)
-    if (cgroup.vartype == CCTK_VARIABLE_REAL ||
-        cgroup.vartype == CCTK_VARIABLE_INT)
-      file << sep << col++ << ":" << varname;
-    else if (cgroup.vartype == CCTK_VARIABLE_COMPLEX) {
-      file << sep << col++ << ":" << varname << ".real";
-      file << sep << col++ << ":" << varname << ".imag";
-    } else
-      assert(0 && "Unexpected variable type");
-  file << "\n";
+  if (write_header) {
+    file << "# 1:iteration" << sep << "2:time";
+    int col = 3;
+    for (const auto &varname : varnames)
+      if (cgroup.vartype == CCTK_VARIABLE_REAL ||
+          cgroup.vartype == CCTK_VARIABLE_INT)
+        file << sep << col++ << ":" << varname;
+      else if (cgroup.vartype == CCTK_VARIABLE_COMPLEX) {
+        file << sep << col++ << ":" << varname << ".real";
+        file << sep << col++ << ":" << varname << ".imag";
+      } else
+        assert(0 && "Unexpected variable type");
+    file << "\n";
+  }
 
   // Output data
   file << cctkGH->cctk_iteration << sep << cctkGH->cctk_time;
@@ -175,7 +185,7 @@ void WriteTSVScalars(const cGH *restrict cctkGH, const std::string &filename,
 }
 
 void WriteTSVArrays(const cGH *restrict cctkGH, const std::string &filename,
-                    const int gi, const int out_dir) {
+                    const int gi, const int out_dir, const bool append) {
   // Output only on root process
   if (CCTK_MyProc(nullptr) > 0)
     return;
@@ -193,29 +203,32 @@ void WriteTSVArrays(const cGH *restrict cctkGH, const std::string &filename,
     varnames.push_back(CCTK_VarName(arraygroupdata.firstvarindex + vi));
 
   const std::string sep = "\t";
-  std::ofstream file(filename);
+  const bool write_header = !append || fileIsEmpty(filename);
+  std::ofstream file(filename, append ? std::ios_base::app
+                                      : std::ios_base::out);
   // get more precision for floats, could also use
   // https://stackoverflow.com/a/30968371
   file << setprecision(std::numeric_limits<CCTK_REAL>::digits10 + 1)
        << scientific;
 
-  // Output header
-  int col = 1;
-  file << "# " << col++ << ":iteration";
-  file << sep << col++ << ":time";
-  for (int dir = 0; dir < arraygroupdata.dimension; ++dir)
-    file << sep << col++ << ":"
-         << "ijk"[dir];
-  for (const auto &varname : varnames)
-    if (cgroup.vartype == CCTK_VARIABLE_REAL ||
-        cgroup.vartype == CCTK_VARIABLE_INT)
-      file << sep << col++ << ":" << varname;
-    else if (cgroup.vartype == CCTK_VARIABLE_COMPLEX) {
-      file << sep << col++ << ":" << varname << ".real";
-      file << sep << col++ << ":" << varname << ".imag";
-    } else
-      assert(0 && "Unexpected variable type");
-  file << "\n";
+  if (write_header) {
+    int col = 1;
+    file << "# " << col++ << ":iteration";
+    file << sep << col++ << ":time";
+    for (int dir = 0; dir < arraygroupdata.dimension; ++dir)
+      file << sep << col++ << ":"
+           << "ijk"[dir];
+    for (const auto &varname : varnames)
+      if (cgroup.vartype == CCTK_VARIABLE_REAL ||
+          cgroup.vartype == CCTK_VARIABLE_INT)
+        file << sep << col++ << ":" << varname;
+      else if (cgroup.vartype == CCTK_VARIABLE_COMPLEX) {
+        file << sep << col++ << ":" << varname << ".real";
+        file << sep << col++ << ":" << varname << ".imag";
+      } else
+        assert(0 && "Unexpected variable type");
+    file << "\n";
+  }
 
   constexpr int di = 1;
   const int dj = di * arraygroupdata.lsh[0];
@@ -238,7 +251,7 @@ void WriteTSVArrays(const cGH *restrict cctkGH, const std::string &filename,
 
 void WriteTSVGFs(const cGH *restrict cctkGH, const std::string &filename,
                  const int gi, const vect<bool, dim> &outdirs,
-                 const vect<CCTK_REAL, dim> &outcoords) {
+                 const vect<CCTK_REAL, dim> &outcoords, const bool append) {
   const auto &groupdata0 =
       *ghext->patchdata.at(0).leveldata.at(0).groupdata.at(gi);
 
@@ -419,27 +432,30 @@ void WriteTSVGFs(const cGH *restrict cctkGH, const std::string &filename,
       varnames.push_back(CCTK_VarName(groupdata0.firstvarindex + vi));
 
     const std::string sep = "\t";
-    std::ofstream file(filename);
+    const bool write_header = !append || fileIsEmpty(filename);
+    std::ofstream file(filename, append ? std::ios_base::app
+                                        : std::ios_base::out);
     // get more precision for floats, could also use
     // https://stackoverflow.com/a/30968371
     file << setprecision(std::numeric_limits<CCTK_REAL>::digits10 + 1)
          << scientific;
 
-    // Output header
-    int col = 0;
-    file << "# " << ++col << ":iteration";
-    file << sep << ++col << ":time";
-    file << sep << ++col << ":patch";
-    file << sep << ++col << ":level";
-    for (int d = 0; d < dim; ++d)
-      file << sep << ++col << ":"
-           << "ijk"[d];
-    for (int d = 0; d < dim; ++d)
-      file << sep << ++col << ":"
-           << "xyz"[d];
-    for (const auto &varname : varnames)
-      file << sep << ++col << ":" << varname;
-    file << "\n";
+    if (write_header) {
+      int col = 0;
+      file << "# " << ++col << ":iteration";
+      file << sep << ++col << ":time";
+      file << sep << ++col << ":patch";
+      file << sep << ++col << ":level";
+      for (int d = 0; d < dim; ++d)
+        file << sep << ++col << ":"
+             << "ijk"[d];
+      for (int d = 0; d < dim; ++d)
+        file << sep << ++col << ":"
+             << "xyz"[d];
+      for (const auto &varname : varnames)
+        file << sep << ++col << ":" << varname;
+      file << "\n";
+    }
 
     // Output data
     for (const auto i : iptr) {
@@ -508,26 +524,44 @@ void OutputTSV(const cGH *restrict cctkGH) {
       groupname = regex_replace(groupname, regex("::"), "-");
       for (auto &ch : groupname)
         ch = tolower(ch);
+      const bool append_scalars = CCTK_EQUALS(out_tsv_scalar_mode, "append");
+      const bool append_spatial = CCTK_EQUALS(out_tsv_spatial_mode, "append");
+      const std::string groupbase = std::string(out_dir) + "/" + groupname;
       std::ostringstream buf;
-      buf << out_dir << "/" << groupname << ".it" << setw(6) << setfill('0')
+      buf << groupbase << ".it" << setw(6) << setfill('0')
           << cctk_iteration;
       const std::string basename = buf.str();
       switch (grouptype) {
       case CCTK_SCALAR:
-        WriteTSVScalars(cctkGH, basename + ".tsv", gi);
+        WriteTSVScalars(cctkGH,
+                        append_scalars ? groupbase + ".tsv"
+                                       : basename + ".tsv",
+                        gi, append_scalars);
         break;
       case CCTK_ARRAY:
-        WriteTSVArrays(cctkGH, basename + ".x.tsv", gi, 0);
-        WriteTSVArrays(cctkGH, basename + ".y.tsv", gi, 1);
-        WriteTSVArrays(cctkGH, basename + ".z.tsv", gi, 2);
+        WriteTSVArrays(cctkGH,
+                       (append_spatial ? groupbase : basename) + ".x.tsv",
+                       gi, 0, append_spatial);
+        WriteTSVArrays(cctkGH,
+                       (append_spatial ? groupbase : basename) + ".y.tsv",
+                       gi, 1, append_spatial);
+        WriteTSVArrays(cctkGH,
+                       (append_spatial ? groupbase : basename) + ".z.tsv",
+                       gi, 2, append_spatial);
         break;
       case CCTK_GF:
-        WriteTSVGFs(cctkGH, basename + ".x.tsv", gi, {true, false, false},
-                    {0, out_xline_y, out_xline_z});
-        WriteTSVGFs(cctkGH, basename + ".y.tsv", gi, {false, true, false},
-                    {out_yline_x, 0, out_yline_z});
-        WriteTSVGFs(cctkGH, basename + ".z.tsv", gi, {false, false, true},
-                    {out_zline_x, out_zline_y, 0});
+        WriteTSVGFs(cctkGH,
+                    (append_spatial ? groupbase : basename) + ".x.tsv", gi,
+                    {true, false, false}, {0, out_xline_y, out_xline_z},
+                    append_spatial);
+        WriteTSVGFs(cctkGH,
+                    (append_spatial ? groupbase : basename) + ".y.tsv", gi,
+                    {false, true, false}, {out_yline_x, 0, out_yline_z},
+                    append_spatial);
+        WriteTSVGFs(cctkGH,
+                    (append_spatial ? groupbase : basename) + ".z.tsv", gi,
+                    {false, false, true}, {out_zline_x, out_zline_y, 0},
+                    append_spatial);
         break;
       default:
         assert(0);

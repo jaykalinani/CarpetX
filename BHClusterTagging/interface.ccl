@@ -1,0 +1,11 @@
+# Interface definition for thorn BHClusterTagging
+
+IMPLEMENTS: BHClusterTagging
+
+INHERITS: CarpetXRegrid PunctureTracker
+
+USES INCLUDE HEADER: defs.hxx
+USES INCLUDE HEADER: loop_device.hxx
+USES INCLUDE HEADER: sum.hxx
+USES INCLUDE HEADER: vect.hxx
+

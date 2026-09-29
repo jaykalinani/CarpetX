@@ -2164,6 +2164,26 @@ void *SetupGH(tFleshConfig *fc, int convLevel, cGH *restrict cctkGH) {
   pp.add("amr.blocking_factor_y", blocking_factor_y);
   pp.add("amr.blocking_factor_z", blocking_factor_z);
   pp.add("amr.grid_eff", grid_efficiency);
+
+  // GRChombo's tag_buffer_size is AMReX's n_error_buf.
+  pp.add("amr.n_error_buf", tag_buffer_size);
+
+  // GRChombo specifies grid_buffer_size in level-local cells. AMReX specifies
+  // proper nesting in blocking-factor units. CarpetX uses a refinement ratio
+  // of two between adjacent levels.
+  constexpr int refinement_ratio = 2;
+  const auto ceil_div = [](const int numerator, const int denominator) {
+    return (numerator + denominator - 1) / denominator;
+  };
+  const int n_proper =
+      std::max({ceil_div(grid_buffer_size * refinement_ratio,
+                         int(blocking_factor_x)),
+                ceil_div(grid_buffer_size * refinement_ratio,
+                         int(blocking_factor_y)),
+                ceil_div(grid_buffer_size * refinement_ratio,
+                         int(blocking_factor_z))});
+  pp.add("amr.n_proper", n_proper);
+
   if (poison_undefined_values) {
     // Tell AMReX to initialize FArrayBoxes with nans
     pp.add("fab.do_initval", true);

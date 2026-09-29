@@ -1,0 +1,26 @@
+# Schedule definitions for thorn BHClusterTagging
+
+SCHEDULE BHClusterTagging_EstimateError AS EstimateError AT postinitial
+  AFTER PunctureTracker_Setup
+{
+  LANG: C
+  READS: PunctureTracker::pt_count
+  READS: PunctureTracker::pt_loc
+  READS: PunctureTracker::pt_properties
+  READS: PunctureTracker::pt_group_count
+  READS: PunctureTracker::pt_membership
+  WRITES: CarpetXRegrid::regrid_error(interior)
+} "Apply BH-cluster and extraction tagging criterion"
+
+SCHEDULE BHClusterTagging_EstimateError AS EstimateError AT poststep
+  AFTER PunctureTracker_Track
+{
+  LANG: C
+  READS: PunctureTracker::pt_count
+  READS: PunctureTracker::pt_loc
+  READS: PunctureTracker::pt_properties
+  READS: PunctureTracker::pt_group_count
+  READS: PunctureTracker::pt_membership
+  WRITES: CarpetXRegrid::regrid_error(interior)
+} "Apply BH-cluster and extraction tagging criterion"
+

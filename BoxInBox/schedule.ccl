@@ -13,24 +13,27 @@ SCHEDULE BoxInBox_Init AT initial
   WRITES: radiixyz
 } "Initialize"
 
-SCHEDULE BoxInBox_Setup AS EstimateError AT postinitial
+if (num_regions > 0)
 {
-  LANG: C
-  READS: active
-  READS: num_levels
-  READS: positions
-  READS: radii
-  READS: radiixyz
-  WRITES: CarpetXRegrid::regrid_error(interior)
-} "Estimate error"
+  SCHEDULE BoxInBox_Setup AS EstimateError AT postinitial
+  {
+    LANG: C
+    READS: active
+    READS: num_levels
+    READS: positions
+    READS: radii
+    READS: radiixyz
+    WRITES: CarpetXRegrid::regrid_error(interior)
+  } "Estimate error"
 
-SCHEDULE BoxInBox_Setup AS EstimateError AT poststep
-{
-  LANG: C
-  READS: active
-  READS: num_levels
-  READS: positions
-  READS: radii
-  READS: radiixyz
-  WRITES: CarpetXRegrid::regrid_error(interior)
-} "Estimate error"
+  SCHEDULE BoxInBox_Setup AS EstimateError AT poststep
+  {
+    LANG: C
+    READS: active
+    READS: num_levels
+    READS: positions
+    READS: radii
+    READS: radiixyz
+    WRITES: CarpetXRegrid::regrid_error(interior)
+  } "Estimate error"
+}

@@ -538,6 +538,11 @@ struct GHExt {
 
   bool use_subcycling = false;
 
+  // True when this GH was constructed by checkpoint recovery. This is
+  // independent of cctk_iteration: an initial-data checkpoint is recovered at
+  // iteration zero.
+  bool recovered = false;
+
   // Active number of RK stages for subcycling, set from ODESolvers::method at
   // WRAGH (SSPRK3 -> 3, else 4). Must be <= max_num_rk_stages.
   int num_rk_stages = 4;
@@ -545,6 +550,11 @@ struct GHExt {
   // Per-level iteration values read from checkpoint; consumed by recovery fixup
   // in schedule.cxx. Indexed [patch][level]. Empty outside of recovery window.
   std::vector<std::vector<std::optional<rat64> > > recovered_level_iterations;
+
+  // Chombo-style level-local regridding counters, used only when
+  // BHClusterTagging enables CarpetX::regrid_intervals. They are reset for a
+  // regridded level and all of its children.
+  std::vector<unsigned long long> bhcluster_regrid_steps;
 
   int num_patches() const { return patchdata.size(); }
   int num_levels(const int patch) const {

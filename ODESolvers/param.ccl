@@ -9,6 +9,9 @@ KEYWORD method "ODE solver method" STEERABLE=always
   "RK3" :: "Kutta's third-order method"
   "SSPRK3" :: "third-order Strong Stability Preserving Runge-Kutta (SSPRK3)"
   "RK4" :: "classic RK4"
+  "RK4-2" :: "Two step, three stage fourth order Runge-Kutta method"
+  "RK4-3" :: "Three step, two stage fourth order Runge-Kutta method"
+  "RK42-IMEX" :: "RK4-2(1) on the explicit RHS, backward Euler on the implicit source"
   "RKF78" :: "Runge-Kutta-Fehlberg 7(8)"
   "DP87" :: "Dormand & Prince 8(7)"
 
@@ -21,6 +24,12 @@ KEYWORD method "ODE solver method" STEERABLE=always
 BOOLEAN verbose "Verbose output" STEERABLE=always
 {
 } "no"
+
+# RK4-2 has two published solutions. Coefficients live in RK4-2_coeffs.hpp.
+CCTK_INT RK4_dash_2_sol "Which published RK4-2 solution to use"
+{
+  1:2 :: "Use solution (1) or (2) of RK4-2"
+} 1
 
 RESTRICTED:
 

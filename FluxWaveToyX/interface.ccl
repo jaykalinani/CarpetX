@@ -35,7 +35,7 @@ CCTK_REAL flux_z TYPE=gf CENTERING={ccv} TAGS='parities={+1 +1 -1   +1 +1 -1   -
   fx_flux_z fy_flux_z fz_flux_z
 } "Flux in z direction"
 
-CCTK_REAL rhs TYPE=gf CENTERING={ccc} TAGS='parities={+1 +1 +1   +1 +1 +1   -1 +1 +1   +1 -1 +1   +1 +1 -1} checkpoint="no"'
+CCTK_REAL rhs TIMELEVELS=4 TYPE=gf CENTERING={ccc} TAGS='parities={+1 +1 +1   +1 +1 +1   -1 +1 +1   +1 -1 +1   +1 +1 -1} checkpoint="no"'
 {
   u_rhs
   ft_rhs

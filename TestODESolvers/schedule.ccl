@@ -1,6 +1,6 @@
 # Schedule definitions for thorn TestODESolvers
 
-STORAGE: state rhs error state2 rhs2 error2 corder
+STORAGE: state rhs[1] error state2 rhs2[1] error2 corder
 
 
 

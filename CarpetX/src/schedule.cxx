@@ -786,6 +786,38 @@ void leave_local_mode(cGH *restrict cctkGH,
   assert(in_patch_mode(cctkGH));
 }
 
+void update_group_pointers(
+    const GHExt::PatchData::LevelData &restrict leveldata, const MFPointer &mfp,
+    cGH *restrict cctkGH, const int gi) {
+  auto &restrict groupdata = *leveldata.groupdata.at(gi);
+  const GridPtrDesc1 grid1(leveldata, groupdata, mfp);
+  const int ntls = int(groupdata.mfab.size());
+  for (int tl = 0; tl < ntls; ++tl) {
+    const amrex::Array4<CCTK_REAL> vars =
+        groupdata.mfab.at(tl)->array(mfp.index());
+    for (int vi = 0; vi < groupdata.numvars; ++vi)
+      cctkGH->data[groupdata.firstvarindex + vi][tl] = grid1.ptr(vars, vi);
+  }
+  const int declared_ntls = CCTK_DeclaredTimeLevelsVI(groupdata.firstvarindex);
+  for (int tl = ntls; tl < declared_ntls; ++tl)
+    for (int vi = 0; vi < groupdata.numvars; ++vi)
+      cctkGH->data[groupdata.firstvarindex + vi][tl] = nullptr;
+}
+
+void update_group_pointers(
+    const GHExt::PatchData::LevelData &restrict leveldata, const int gi) {
+  if (leveldata.local_cctkGHs.empty() || !leveldata.fab)
+    return;
+  int component = 0;
+  const auto mfitinfo = amrex::MFItInfo().DisableDeviceSync().EnableTiling();
+  for (amrex::MFIter mfi(*leveldata.fab, mfitinfo); mfi.isValid();
+       ++mfi, ++component) {
+    const MFPointer mfp(mfi);
+    cGH *restrict const localGH = leveldata.get_local_cctkGH(component);
+    update_group_pointers(leveldata, mfp, localGH, gi);
+  }
+}
+
 // Should this be passed in `cGH`?
 int CallFunction_count = -1;
 extern "C" CCTK_INT CarpetX_GetCallFunctionCount() {

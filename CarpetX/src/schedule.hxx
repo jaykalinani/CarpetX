@@ -250,6 +250,13 @@ void leave_local_mode(cGH *restrict cctkGH,
                       const GHExt::PatchData::LevelData &restrict leveldata,
                       const MFPointer &mfp);
 
+// Recompute cctkGH->data[vi][tl] for one group. Slots past the allocated
+// MultiFabs are nulled, up to the declared time level count.
+void update_group_pointers(const GHExt::PatchData::LevelData &restrict leveldata,
+                           const MFPointer &mfp, cGH *restrict cctkGH, int gi);
+void update_group_pointers(
+    const GHExt::PatchData::LevelData &restrict leveldata, int gi);
+
 void synchronize();
 
 // These functions are defined in valid.cxx. These prototypes should

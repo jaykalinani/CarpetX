@@ -1,7 +1,69 @@
 #include "solve.hxx"
 
+#include "RK4-2_coeffs.hpp"
+#include "RK4-3_coeffs.hpp"
+
 namespace ODESolvers {
 using namespace std;
+
+// How many previous RHS evaluations a method keeps, beyond the one it
+// evaluates itself. Zero for every one-step method.
+int history_depth(const char *const method) {
+  if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK42-IMEX"))
+    return 1;
+  if (CCTK_EQUALS(method, "RK4-3"))
+    return 2;
+  return 0;
+}
+
+// Time levels of each RHS group. A hybrid method needs its history slots plus
+// room to park stage values that have to outlive a later RHS evaluation.
+// Four covers both hybrid methods. The user has to declare that many anyway,
+// because ODESolvers::method is steerable.
+int rhs_timelevels(const char *const method) {
+  return history_depth(method) == 0 ? 1 : 4;
+}
+
+// Ask the driver for the RHS time levels the current method needs.
+//
+// Called at WRAGH, before any level exists, so the first allocation is
+// already the right size. Called again at the top of every step, because the
+// method is steerable.
+void setup_rhs_storage(const char *const method, const bool verbose,
+                       const bool use_subcycling) {
+  const int depth = history_depth(method);
+  if (depth > 0 && use_subcycling)
+    CCTK_VERROR("ODESolvers method \"%s\" keeps RHS history in extra time "
+                "levels and is not implemented for CarpetX::use_subcycling. "
+                "Set Driver::use_subcycling = no.",
+                method);
+
+  const int ntls = rhs_timelevels(method);
+  const int num_groups = CCTK_NumGroups();
+  for (int gi = 0; gi < num_groups; ++gi) {
+    if (CCTK_GroupTypeI(gi) != CCTK_GF)
+      continue;
+    const int rhs_gi = get_group_rhs(gi);
+    if (rhs_gi < 0)
+      continue;
+
+    const int declared_ntls = CCTK_DeclaredTimeLevelsGI(rhs_gi);
+    if (ntls > declared_ntls)
+      CCTK_VERROR("The ODE solver method \"%s\" keeps %d previous RHS "
+                  "evaluation(s), and needs %d time levels of the RHS "
+                  "group \"%s\", named by \"%s\", to hold them and its own "
+                  "stage values. That group declares %d. Write TIMELEVELS=%d "
+                  "in its interface.ccl.",
+                  method, depth, ntls, CCTK_FullGroupName(rhs_gi),
+                  CCTK_FullGroupName(gi), declared_ntls, ntls);
+
+    const int old_ntls = CarpetX::SetGroupTimelevels(rhs_gi, ntls);
+    if (verbose && old_ntls != ntls)
+      CCTK_VINFO("Method \"%s\": RHS group \"%s\" now has %d time level(s), "
+                 "was %d",
+                 method, CCTK_FullGroupName(rhs_gi), ntls, old_ntls);
+  }
+}
 
 extern "C" void ODESolvers_InitConstants(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTS_ODESolvers_InitConstants;
@@ -16,13 +78,24 @@ extern "C" void ODESolvers_InitConstants(CCTK_ARGUMENTS) {
                                                                         : 4;
 }
 
+extern "C" void ODESolvers_SetupStorage(CCTK_ARGUMENTS) {
+  DECLARE_CCTK_ARGUMENTS_ODESolvers_SetupStorage;
+  DECLARE_CCTK_PARAMETERS;
+
+  setup_rhs_storage(method, verbose, use_subcycling);
+}
+
 extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTS_ODESolvers_Solve;
   DECLARE_CCTK_PARAMETERS;
 
   static bool did_output = false;
-  if (verbose || !did_output)
-    CCTK_VINFO("ODE integrator is %s", method);
+  if (verbose || !did_output) {
+    if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK42-IMEX"))
+      CCTK_VINFO("ODE integrator is %s(%d)", method, RK4_dash_2_sol);
+    else
+      CCTK_VINFO("ODE integrator is %s", method);
+  }
   did_output = true;
 
   static Timer timer("ODESolvers::Solve");
@@ -34,6 +107,12 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
 
   static Timer timer_setup("ODESolvers::Solve::setup");
   std::optional<Interval> interval_setup(timer_setup);
+
+  // method is steerable, so the count requested at WRAGH may no longer match.
+  // Re-request before anything below caches a MultiFab pointer.
+  setup_rhs_storage(method, verbose, use_subcycling);
+  // SetGroupTimelevels refuses to run while this is set.
+  const CarpetX::integrating_guard_t integrating_guard;
 
   statecomp_t var, rhs;
   std::vector<int> var_groups, rhs_groups, dep_groups;
@@ -281,6 +360,101 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
         CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
       };
 
+  // A state vector addressing RHS time level `slot` on every active level.
+  // Rebuild it after SwapGroupTimelevels: a statecomp_t keeps the MultiFab
+  // that used to sit in that slot.
+  const auto slot_state = [&](const int slot) {
+    statecomp_t result;
+    CarpetX::active_levels->loop_serially([&](const auto &leveldata) {
+      for (const auto &groupdataptr : leveldata.groupdata) {
+        if (groupdataptr == nullptr)
+          continue;
+        auto &groupdata = *groupdataptr;
+        const int rhs_gi = get_group_rhs(groupdata.groupindex);
+        if (rhs_gi < 0)
+          continue;
+        auto &rhs_groupdata = *leveldata.groupdata.at(rhs_gi);
+        result.push_component(&rhs_groupdata, slot);
+      }
+    });
+    return result;
+  };
+
+  const auto swap_rhs_slots = [&](const int a, const int b) {
+    for (const int rhs_gi : rhs_groups)
+      CarpetX::SwapGroupTimelevels(rhs_gi, a, b);
+  };
+
+  const auto history_incomplete = [&](const int depth) {
+    bool incomplete = false;
+    CarpetX::active_levels->loop_serially([&](const auto &leveldata) {
+      for (const auto &groupdataptr : leveldata.groupdata) {
+        if (groupdataptr == nullptr)
+          continue;
+        auto &groupdata = *groupdataptr;
+        const int rhs_gi = get_group_rhs(groupdata.groupindex);
+        if (rhs_gi < 0)
+          continue;
+        auto &rhs_groupdata = *leveldata.groupdata.at(rhs_gi);
+        for (int slot = 1; slot <= depth; ++slot)
+          for (int vi = 0; vi < rhs_groupdata.numvars; ++vi)
+            if (!rhs_groupdata.valid.at(slot).at(vi).get().valid_int)
+              incomplete = true;
+      }
+    });
+    return incomplete;
+  };
+
+  // Slots past the method's history depth hold stage scratch. Poison them so
+  // a different hybrid method steered in on the next step does not treat
+  // them as history.
+  const auto invalidate_slots_beyond = [&](const int depth) {
+    for (int slot = depth + 1; slot <= 3; ++slot)
+      slot_state(slot).set_valid(valid_t(false));
+  };
+
+  // Classic RK4, used whenever the history is missing: t=0, recovery, a
+  // rebuilt level, or the step that first selects a hybrid method. The two
+  // swaps leave slot 0 holding f(y_n) rather than the last stage RHS.
+  // CycleTimelevels then rotates that into slot 1 for the next step.
+  const auto hybrid_bootstrap = [&](const int depth) {
+    if (verbose)
+      CCTK_VINFO("  Taking RK4 step to fill prev. RHS");
+
+    const auto old = copy_state(var, make_valid_all());
+
+    calcrhs(1);
+    swap_rhs_slots(0, 3);
+    const auto kaccum = copy_state(slot_state(3), make_valid_int());
+    calcupdate(1, dt / 2, 1.0, reals<1>{dt / 2}, states<1>{&kaccum});
+
+    calcrhs(2);
+    const auto k2 = slot_state(0);
+    {
+      Interval interval_lincomb(timer_lincomb);
+      statecomp_t::lincomb(kaccum, 1.0, reals<1>{2.0}, states<1>{&k2},
+                           make_valid_int());
+    }
+    calcupdate(2, dt / 2, 0.0, reals<2>{1.0, dt / 2}, states<2>{&old, &k2});
+
+    calcrhs(3);
+    const auto k3 = slot_state(0);
+    {
+      Interval interval_lincomb(timer_lincomb);
+      statecomp_t::lincomb(kaccum, 1.0, reals<1>{2.0}, states<1>{&k3},
+                           make_valid_int());
+    }
+    calcupdate(3, dt, 0.0, reals<2>{1.0, dt}, states<2>{&old, &k3});
+
+    calcrhs(4);
+    const auto k4 = slot_state(0);
+    calcupdate(4, dt, 0.0, reals<3>{1.0, dt / 6, dt / 6},
+               states<3>{&old, &kaccum, &k4});
+
+    swap_rhs_slots(0, 3);
+    invalidate_slots_beyond(depth);
+  };
+
   *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time;
 
   if (CCTK_EQUALS(method, "constant")) {
@@ -388,6 +562,294 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
     calcrhs(4);
     calcupdate(4, dt, 0.0, reals<3>{1.0, dt / 6, dt / 6},
                states<3>{&old, &kaccum, &rhs});
+
+  } else if (CCTK_EQUALS(method, "RK4-2")) {
+
+    const int depth = history_depth(method);
+
+    if (history_incomplete(depth)) {
+
+      hybrid_bootstrap(depth);
+
+    } else {
+      using namespace MultiStepRungeKutta;
+
+      // k0 = f(t - h,      y(t - h))
+      // k1 = f(t,          y(t))
+      // k2 = f(t + c2 * h, y(t) + h * (a20 * k0 + a21 * k1))
+      // k3 = f(t + c3 * h, y(t) + h * (a30 * k0 + a31 * k1 + a32 * k2))
+      // y(t + h) = y(t) + h * (b0 * k0 + b1 * k1 + b2 * k2 + b3 * k3)
+
+      const CCTK_REAL c2_pure{RK4_dash_2_sol == 1
+                                  ? rk4_dash_2_sol_1_c2<CCTK_REAL>()
+                                  : rk4_dash_2_sol_2_c2<CCTK_REAL>()};
+      const CCTK_REAL c3_pure{RK4_dash_2_sol == 1
+                                  ? rk4_dash_2_sol_1_c3<CCTK_REAL>()
+                                  : rk4_dash_2_sol_2_c3<CCTK_REAL>()};
+      const CCTK_REAL b0_pure{RK4_dash_2_sol == 1
+                                  ? rk4_dash_2_sol_1_b0<CCTK_REAL>()
+                                  : rk4_dash_2_sol_2_b0<CCTK_REAL>()};
+      const CCTK_REAL b1_pure{RK4_dash_2_sol == 1
+                                  ? rk4_dash_2_sol_1_b1<CCTK_REAL>()
+                                  : rk4_dash_2_sol_2_b1<CCTK_REAL>()};
+      const CCTK_REAL b2_pure{RK4_dash_2_sol == 1
+                                  ? rk4_dash_2_sol_1_b2<CCTK_REAL>()
+                                  : rk4_dash_2_sol_2_b2<CCTK_REAL>()};
+      const CCTK_REAL a20_pure{RK4_dash_2_sol == 1
+                                   ? rk4_dash_2_sol_1_a20<CCTK_REAL>()
+                                   : rk4_dash_2_sol_2_a20<CCTK_REAL>()};
+      const CCTK_REAL a30_pure{RK4_dash_2_sol == 1
+                                   ? rk4_dash_2_sol_1_a30<CCTK_REAL>()
+                                   : rk4_dash_2_sol_2_a30<CCTK_REAL>()};
+      const CCTK_REAL a31_pure{RK4_dash_2_sol == 1
+                                   ? rk4_dash_2_sol_1_a31<CCTK_REAL>()
+                                   : rk4_dash_2_sol_2_a31<CCTK_REAL>()};
+      const CCTK_REAL b3_pure{1.0 - (b0_pure + b1_pure + b2_pure)};
+      const CCTK_REAL a21_pure{c2_pure - a20_pure};
+      const CCTK_REAL a32_pure{c3_pure - (a30_pure + a31_pure)};
+
+      const CCTK_REAL b0{b0_pure * dt};
+      const CCTK_REAL b1{b1_pure * dt};
+      const CCTK_REAL b2{b2_pure * dt};
+      const CCTK_REAL b3{b3_pure * dt};
+      const CCTK_REAL a20{a20_pure * dt};
+      const CCTK_REAL a21{a21_pure * dt};
+      const CCTK_REAL a30{a30_pure * dt};
+      const CCTK_REAL a31{a31_pure * dt};
+      const CCTK_REAL a32{a32_pure * dt};
+      // c_i are searched over [-2, 2], so a stage time can lie before t.
+      const CCTK_REAL c2{c2_pure * dt};
+      const CCTK_REAL c3{c3_pure * dt};
+
+      // Entry, after CycleTimelevels: [scratch, f(y_{n-1}), dead, dead]
+      const auto old = copy_state(var, make_valid_all());
+      const auto k0 = slot_state(1);
+
+      calcrhs(1);
+      swap_rhs_slots(0, 3);
+      const auto k1 = slot_state(3);
+      calcupdate(1, c2, 0.0, reals<3>{1.0, a20, a21},
+                 states<3>{&old, &k0, &k1});
+
+      calcrhs(2);
+      swap_rhs_slots(0, 2);
+      const auto k2 = slot_state(2);
+      calcupdate(2, c3, 0.0, reals<4>{1.0, a30, a31, a32},
+                 states<4>{&old, &k0, &k1, &k2});
+
+      calcrhs(3);
+      const auto k3 = slot_state(0);
+      calcupdate(3, dt, 0.0, reals<5>{1.0, b0, b1, b2, b3},
+                 states<5>{&old, &k0, &k1, &k2, &k3});
+
+      swap_rhs_slots(0, 3);
+      invalidate_slots_beyond(depth);
+    }
+
+  } else if (CCTK_EQUALS(method, "RK42-IMEX")) {
+
+    // Explicit RK4-2(1) on ODESolvers_RHS, backward Euler on
+    // ODESolvers_ImplicitStep. The stored history is the explicit RHS only.
+    // Solution (2) starts at a negative abscissa, before any stage has a
+    // relaxed momentum to restore, so it is refused.
+    if (RK4_dash_2_sol != 1)
+      CCTK_VERROR("RK42-IMEX uses RK4-2 solution (1). Solution (%d) leads "
+                  "with a negative stage abscissa. Set "
+                  "ODESolvers::RK4_dash_2_sol = 1.",
+                  int(RK4_dash_2_sol));
+
+    const int depth = history_depth(method);
+    const int momentum_gi = CCTK_GroupIndex("nuX_Base::rF");
+
+    // Copy nuX momentum from the last relaxed stage back onto the explicit
+    // stage. Energy-like variables keep the explicit combination. No-op when
+    // this run has no nuX momentum group.
+    const auto restore_momentum = [&](const statecomp_t &src) {
+      if (momentum_gi < 0)
+        return;
+      bool found = false;
+      for (size_t m = 0; m < var.groupdatas.size(); ++m) {
+        if (var.groupdatas.at(m)->groupindex != momentum_gi)
+          continue;
+        size_t src_at = src.groupdatas.size();
+        for (size_t n = 0; n < src.groupdatas.size(); ++n) {
+          if (src.groupdatas.at(n) == var.groupdatas.at(m))
+            src_at = n;
+        }
+        if (src_at == src.groupdatas.size())
+          CCTK_ERROR("RK42-IMEX saved stage is missing a momentum component");
+        const int ncomp = var.mfabs.at(m)->nComp();
+        amrex::MultiFab::Copy(*var.mfabs.at(m), *src.mfabs.at(src_at), 0, 0,
+                              ncomp, 0);
+        found = true;
+      }
+      if (!found)
+        CCTK_ERROR("RK42-IMEX found nuX_Base::rF but it is not evolved");
+      mark_invalid(dep_groups);
+      Interval interval_poststep(timer_poststep);
+      CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+    };
+
+    const auto source_step = [&](const int n, const CCTK_REAL step_dt) {
+      if (!(step_dt > 0))
+        CCTK_VERROR("RK42-IMEX implicit step %d requires a positive dt, "
+                    "got %g",
+                    n, double(step_dt));
+      calcimplicitstep(n, step_dt);
+      Interval interval_poststep(timer_poststep);
+      CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+    };
+
+    // c_abs is the stage offset from t_n, and the backward-Euler step size.
+    const auto relax_stage = [&](const int n, const CCTK_REAL c_abs,
+                                 statecomp_t &saved, bool &have_saved) {
+      if (c_abs > 0) {
+        source_step(n, c_abs);
+        saved = var.copy(make_valid_all());
+        have_saved = true;
+      } else if (c_abs < 0) {
+        if (momentum_gi < 0)
+          return;
+        if (!have_saved)
+          CCTK_ERROR("RK42-IMEX reached a negative stage abscissa before "
+                     "any implicit stage saved the momentum");
+        restore_momentum(saved);
+      } else {
+        CCTK_ERROR("RK42-IMEX stage abscissa is zero");
+      }
+    };
+
+    using namespace MultiStepRungeKutta;
+
+    const CCTK_REAL c2_pure{rk4_dash_2_sol_1_c2<CCTK_REAL>()};
+    const CCTK_REAL c3_pure{rk4_dash_2_sol_1_c3<CCTK_REAL>()};
+    const CCTK_REAL b0_pure{rk4_dash_2_sol_1_b0<CCTK_REAL>()};
+    const CCTK_REAL b1_pure{rk4_dash_2_sol_1_b1<CCTK_REAL>()};
+    const CCTK_REAL b2_pure{rk4_dash_2_sol_1_b2<CCTK_REAL>()};
+    const CCTK_REAL a20_pure{rk4_dash_2_sol_1_a20<CCTK_REAL>()};
+    const CCTK_REAL a30_pure{rk4_dash_2_sol_1_a30<CCTK_REAL>()};
+    const CCTK_REAL a31_pure{rk4_dash_2_sol_1_a31<CCTK_REAL>()};
+    const CCTK_REAL b3_pure{1.0 - (b0_pure + b1_pure + b2_pure)};
+    const CCTK_REAL a21_pure{c2_pure - a20_pure};
+    const CCTK_REAL a32_pure{c3_pure - (a30_pure + a31_pure)};
+
+    const CCTK_REAL b0{b0_pure * dt};
+    const CCTK_REAL b1{b1_pure * dt};
+    const CCTK_REAL b2{b2_pure * dt};
+    const CCTK_REAL b3{b3_pure * dt};
+    const CCTK_REAL a20{a20_pure * dt};
+    const CCTK_REAL a21{a21_pure * dt};
+    const CCTK_REAL a30{a30_pure * dt};
+    const CCTK_REAL a31{a31_pure * dt};
+    const CCTK_REAL a32{a32_pure * dt};
+    const CCTK_REAL c2{c2_pure * dt};
+    const CCTK_REAL c3{c3_pure * dt};
+
+    if (!(c2 > 0))
+      CCTK_ERROR("RK42-IMEX solution (1) must open with a positive abscissa");
+
+    if (history_incomplete(depth)) {
+
+      // The explicit RHS has no collision term. A classic RK4 starter would
+      // free-stream through a stiff step. One IMEX Euler step both advances
+      // the source and leaves f_exp(y_n) in slot 0 for the next step.
+      if (verbose)
+        CCTK_VINFO("  Taking an IMEX Euler step to fill the explicit RHS");
+
+      calcrhs(1);
+      swap_rhs_slots(0, 3);
+      const auto k1 = slot_state(3);
+      calcupdate(1, dt, 1.0, reals<1>{dt}, states<1>{&k1});
+      source_step(1, dt);
+      swap_rhs_slots(0, 3);
+      invalidate_slots_beyond(depth);
+
+    } else {
+
+      const auto old = copy_state(var, make_valid_all());
+      const auto k0 = slot_state(1);
+      statecomp_t saved;
+      bool have_saved = false;
+
+      calcrhs(1);
+      swap_rhs_slots(0, 3);
+      const auto k1 = slot_state(3);
+      calcupdate(1, c2, 0.0, reals<3>{1.0, a20, a21},
+                 states<3>{&old, &k0, &k1});
+      relax_stage(1, c2, saved, have_saved);
+
+      calcrhs(2);
+      swap_rhs_slots(0, 2);
+      const auto k2 = slot_state(2);
+      calcupdate(2, c3, 0.0, reals<4>{1.0, a30, a31, a32},
+                 states<4>{&old, &k0, &k1, &k2});
+      relax_stage(2, c3, saved, have_saved);
+
+      calcrhs(3);
+      const auto k3 = slot_state(0);
+      calcupdate(3, dt, 0.0, reals<5>{1.0, b0, b1, b2, b3},
+                 states<5>{&old, &k0, &k1, &k2, &k3});
+      source_step(4, dt);
+
+      swap_rhs_slots(0, 3);
+      invalidate_slots_beyond(depth);
+    }
+
+  } else if (CCTK_EQUALS(method, "RK4-3")) {
+
+    const int depth = history_depth(method);
+
+    if (history_incomplete(depth)) {
+
+      hybrid_bootstrap(depth);
+
+    } else {
+      using namespace MultiStepRungeKutta;
+
+      // k0 = f(t - 2 * h,  y(t - 2 * h))
+      // k1 = f(t - h,      y(t - h))
+      // k2 = f(t,          y(t))
+      // k3 = f(t + c3 * h, y(t) + h * (a30 * k0 + a31 * k1 + a32 * k2))
+      // y(t + h) = y(t) + h * (b0 * k0 + b1 * k1 + b2 * k2 + b3 * k3)
+
+      const CCTK_REAL c3_pure{rk4_dash_3_sol_1_c3<CCTK_REAL>()};
+      const CCTK_REAL b0_pure{rk4_dash_3_sol_1_b0<CCTK_REAL>()};
+      const CCTK_REAL b1_pure{rk4_dash_3_sol_1_b1<CCTK_REAL>()};
+      const CCTK_REAL b2_pure{rk4_dash_3_sol_1_b2<CCTK_REAL>()};
+      const CCTK_REAL a30_pure{rk4_dash_3_sol_1_a30<CCTK_REAL>()};
+      const CCTK_REAL a31_pure{rk4_dash_3_sol_1_a31<CCTK_REAL>()};
+      const CCTK_REAL b3_pure{1.0 - (b0_pure + b1_pure + b2_pure)};
+      const CCTK_REAL a32_pure{c3_pure - (a30_pure + a31_pure)};
+
+      const CCTK_REAL b0{b0_pure * dt};
+      const CCTK_REAL b1{b1_pure * dt};
+      const CCTK_REAL b2{b2_pure * dt};
+      const CCTK_REAL b3{b3_pure * dt};
+      const CCTK_REAL a30{a30_pure * dt};
+      const CCTK_REAL a31{a31_pure * dt};
+      const CCTK_REAL a32{a32_pure * dt};
+      const CCTK_REAL c3{c3_pure * dt};
+
+      // Entry, after CycleTimelevels:
+      // [scratch, f(y_{n-1}), f(y_{n-2}), dead]
+      const auto old = copy_state(var, make_valid_all());
+      const auto k0 = slot_state(2);
+      const auto k1 = slot_state(1);
+
+      calcrhs(1);
+      swap_rhs_slots(0, 3);
+      const auto k2 = slot_state(3);
+      calcupdate(1, c3, 0.0, reals<4>{1.0, a30, a31, a32},
+                 states<4>{&old, &k0, &k1, &k2});
+
+      calcrhs(2);
+      const auto k3 = slot_state(0);
+      calcupdate(2, dt, 0.0, reals<5>{1.0, b0, b1, b2, b3},
+                 states<5>{&old, &k0, &k1, &k2, &k3});
+
+      swap_rhs_slots(0, 3);
+      invalidate_slots_beyond(depth);
+    }
 
   } else if (CCTK_EQUALS(method, "RKF78")) {
 

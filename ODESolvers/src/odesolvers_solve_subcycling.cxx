@@ -97,6 +97,13 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTS_ODESolvers_Solve_Subcycling;
   DECLARE_CCTK_PARAMETERS;
 
+  if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK4-3") ||
+      CCTK_EQUALS(method, "RK42-IMEX"))
+    CCTK_VERROR("ODESolvers method \"%s\" keeps RHS history in extra time "
+                "levels and is not implemented for CarpetX::use_subcycling. "
+                "Set Driver::use_subcycling = no.",
+                method);
+
   static bool did_output = false;
   if (verbose || !did_output)
     CCTK_VINFO("Integrator is %s", method);

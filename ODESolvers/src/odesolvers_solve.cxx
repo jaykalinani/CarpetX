@@ -2,6 +2,8 @@
 
 #include "RK4-2_coeffs.hpp"
 #include "RK4-3_coeffs.hpp"
+#include "RK42_IMEX2L_coeffs.hpp"
+#include "IMEX32L_coeffs.hpp"
 
 namespace ODESolvers {
 using namespace std;
@@ -9,7 +11,8 @@ using namespace std;
 // How many previous RHS evaluations a method keeps, beyond the one it
 // evaluates itself. Zero for every one-step method.
 int history_depth(const char *const method) {
-  if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK42-IMEX"))
+  if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK42-IMEX") ||
+      CCTK_EQUALS(method, "RK42-IMEX2L"))
     return 1;
   if (CCTK_EQUALS(method, "RK4-3"))
     return 2;
@@ -91,7 +94,8 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
 
   static bool did_output = false;
   if (verbose || !did_output) {
-    if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK42-IMEX"))
+    if (CCTK_EQUALS(method, "RK4-2") || CCTK_EQUALS(method, "RK42-IMEX") ||
+        CCTK_EQUALS(method, "RK42-IMEX2L"))
       CCTK_VINFO("ODE integrator is %s(%d)", method, RK4_dash_2_sol);
     else
       CCTK_VINFO("ODE integrator is %s", method);
@@ -257,11 +261,16 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
     }
   };
 
+  // c_exp and c_imp are the explicit and implicit abscissae. They are equal
+  // for IMEX42L. IMEX-SSP3(3,3,2) evaluates the flux and the source of a
+  // stage at different times, so the two vectors differ there.
   const auto run_imex =
-      [&](const vector<CCTK_REAL> &cs, const vector<vector<CCTK_REAL> > &a_exp,
+      [&](const vector<CCTK_REAL> &c_exp, const vector<CCTK_REAL> &c_imp,
+          const vector<vector<CCTK_REAL> > &a_exp,
           const vector<vector<CCTK_REAL> > &a_imp,
           const vector<CCTK_REAL> &b_exp, const vector<CCTK_REAL> &b_imp) {
-        const int nstages = cs.size();
+        const int nstages = c_exp.size();
+        assert(int(c_imp.size()) == nstages);
         assert(int(a_exp.size()) == nstages);
         assert(int(a_imp.size()) == nstages);
         assert(int(b_exp.size()) == nstages);
@@ -295,12 +304,13 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
                           "ODESolvers after defining IMEX stage base");
           mark_invalid(dep_groups);
           *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
-              old_time + cs.at(stage) * dt;
+              old_time + c_imp.at(stage) * dt;
         };
 
         for (int stage = 0; stage < nstages; ++stage) {
           if (stage == 0) {
-            *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time;
+            *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
+                old_time + c_imp.at(0) * dt;
           } else {
             define_stage_base(stage);
             calcpreimplicit();
@@ -332,6 +342,8 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
             gks.push_back(copy_state(rhs, make_valid_int()));
           }
 
+          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
+              old_time + c_exp.at(stage) * dt;
           calcrhs(stage + 1);
           fks.push_back(copy_state(rhs, make_valid_int()));
         }
@@ -795,6 +807,200 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
       invalidate_slots_beyond(depth);
     }
 
+  } else if (CCTK_EQUALS(method, "RK42-IMEX2L")) {
+
+    // RK4-2(1) on the explicit RHS, two-stage L-stable DIRK on the source.
+    // gamma = 1 - sqrt(2)/2. Both solves use step gamma*dt.
+    //   f1 = f(y_n)
+    //   Z1 = y_n + h*gamma*f1 + h*gamma*g(Z1)
+    //   Y2 = y_n + h*(a20*f0 + a21*f1 + c2*g1)
+    //   Y3 = y_n + h*(a30*f0 + a31*f1 + a32*f2 + c3*g1)
+    //   y+ = y_n + h*(b0*f0 + b1*f1 + b2*f2 + b3*f3 + (1-gamma)*g1)
+    //        + h*gamma*g(y+)
+    // c3 is negative, so it only weights g1. It is not a solve, and this
+    // method does not restore momentum. g1 is kept only until the end of
+    // this step. History stores the explicit RHS. Solution (2) leads with
+    // a negative abscissa and is refused.
+    if (RK4_dash_2_sol != 1)
+      CCTK_VERROR("RK42-IMEX2L uses RK4-2 solution (1). Solution (%d) leads "
+                  "with a negative stage abscissa. Set "
+                  "ODESolvers::RK4_dash_2_sol = 1.",
+                  int(RK4_dash_2_sol));
+
+    const int depth = history_depth(method);
+    if (depth != 1)
+      CCTK_ERROR("RK42-IMEX2L keeps one previous explicit RHS");
+
+    using namespace MultiStepRungeKutta;
+    const CCTK_REAL gamma = rk42_imex2l_gamma<CCTK_REAL>();
+    const CCTK_REAL gamma_dt = gamma * dt;
+    const CCTK_REAL implicit_weight = (CCTK_REAL(1) - gamma) * dt;
+    if (!(gamma > 0) || !(gamma < 1))
+      CCTK_ERROR("RK42-IMEX2L DIRK diagonal must lie in (0, 1)");
+
+    // Build the DIRK base in var, solve Z = base + gamma*dt*g(Z), and
+    // optionally recover g = (Z - base) / (gamma*dt) into the current RHS
+    // slot. The caller's RHS views must be slot_state() results: a saved
+    // statecomp_t keeps the MultiFab from before SwapGroupTimelevels.
+    const auto take_dirk =
+        [&](const int n, const CCTK_REAL stage_time,
+            const vector<CCTK_REAL> &factors,
+            const vector<const statecomp_t *> &srcs,
+            const bool recover_g) -> statecomp_t {
+      if (!(gamma_dt > 0))
+        CCTK_VERROR("RK42-IMEX2L implicit step %d requires a positive dt, "
+                    "got %g",
+                    n, double(gamma_dt));
+      {
+        Interval interval_lincomb(timer_lincomb);
+        statecomp_t::lincomb(var, 0.0, factors, srcs, make_valid_int());
+        var.check_valid(make_valid_int(),
+                        "ODESolvers after defining RK42-IMEX2L implicit base");
+        mark_invalid(dep_groups);
+      }
+      *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + stage_time;
+      // PostStep runs before the base is copied. A repair made there stays
+      // in the state and is not recovered as g.
+      calcpreimplicit();
+      const auto base = copy_state(var, make_valid_all());
+      calcimplicitstep(n, gamma_dt);
+      {
+        Interval interval_poststep(timer_poststep);
+        CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
+      }
+      if (!recover_g)
+        return statecomp_t();
+      // RHS slot 0 is scratch here. History slots stay untouched:
+      // mark_invalid only clears time level 0.
+      const auto g_slot = slot_state(0);
+      {
+        Interval interval_lincomb(timer_lincomb);
+        statecomp_t::lincomb(
+            g_slot, 0.0,
+            vector<CCTK_REAL>{CCTK_REAL(1) / gamma_dt,
+                              -CCTK_REAL(1) / gamma_dt},
+            vector<const statecomp_t *>{&var, &base}, make_valid_int());
+        g_slot.check_valid(make_valid_int(),
+                           "ODESolvers effective implicit RHS");
+      }
+      CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
+      return copy_state(g_slot, make_valid_int());
+    };
+
+    // copy() shares the RHS group's validity flags and keeps its own
+    // MultiFab. mark_invalid and SwapGroupTimelevels retarget those flags
+    // while the saved source is still the one the later stages need.
+    const auto refresh_saved_g = [](const statecomp_t &g) {
+      g.set_valid(make_valid_int());
+    };
+
+    if (history_incomplete(depth)) {
+
+      // Shift each RK4 stage by c*h*g1 and finish with the same DIRK.
+      // The step is classic RK4 when g is zero, which requires the
+      // implicit kernel to leave the saved base unchanged. Slot 0 ends
+      // as f(y_n).
+      if (verbose)
+        CCTK_VINFO("  Taking an RK4 plus DIRK step to fill the explicit RHS");
+
+      const auto old = copy_state(var, make_valid_all());
+      calcrhs(1);
+      swap_rhs_slots(0, 3);
+      const auto k1 = slot_state(3);
+      const auto g1 =
+          take_dirk(1, gamma_dt, vector<CCTK_REAL>{CCTK_REAL(1), gamma_dt},
+                    vector<const statecomp_t *>{&old, &k1}, true);
+
+      refresh_saved_g(g1);
+      calcupdate(2, dt / 2, 0.0, reals<3>{CCTK_REAL(1), dt / 2, dt / 2},
+                 states<3>{&old, &k1, &g1});
+      calcrhs(2);
+      const auto k2 = copy_state(slot_state(0), make_valid_int());
+
+      refresh_saved_g(g1);
+      calcupdate(3, dt / 2, 0.0, reals<3>{CCTK_REAL(1), dt / 2, dt / 2},
+                 states<3>{&old, &k2, &g1});
+      calcrhs(3);
+      const auto k3 = copy_state(slot_state(0), make_valid_int());
+
+      refresh_saved_g(g1);
+      calcupdate(4, dt, 0.0, reals<3>{CCTK_REAL(1), dt, dt},
+                 states<3>{&old, &k3, &g1});
+      calcrhs(4);
+      const auto k4 = copy_state(slot_state(0), make_valid_int());
+
+      refresh_saved_g(g1);
+      take_dirk(5, dt,
+                vector<CCTK_REAL>{CCTK_REAL(1), dt / 6, dt / 3, dt / 3,
+                                  dt / 6, implicit_weight},
+                vector<const statecomp_t *>{&old, &k1, &k2, &k3, &k4, &g1},
+                true);
+      swap_rhs_slots(0, 3);
+      invalidate_slots_beyond(depth);
+
+    } else {
+
+      const CCTK_REAL c2_pure{rk4_dash_2_sol_1_c2<CCTK_REAL>()};
+      const CCTK_REAL c3_pure{rk4_dash_2_sol_1_c3<CCTK_REAL>()};
+      const CCTK_REAL b0_pure{rk4_dash_2_sol_1_b0<CCTK_REAL>()};
+      const CCTK_REAL b1_pure{rk4_dash_2_sol_1_b1<CCTK_REAL>()};
+      const CCTK_REAL b2_pure{rk4_dash_2_sol_1_b2<CCTK_REAL>()};
+      const CCTK_REAL a20_pure{rk4_dash_2_sol_1_a20<CCTK_REAL>()};
+      const CCTK_REAL a30_pure{rk4_dash_2_sol_1_a30<CCTK_REAL>()};
+      const CCTK_REAL a31_pure{rk4_dash_2_sol_1_a31<CCTK_REAL>()};
+      const CCTK_REAL b3_pure{1.0 - (b0_pure + b1_pure + b2_pure)};
+      const CCTK_REAL a21_pure{c2_pure - a20_pure};
+      const CCTK_REAL a32_pure{c3_pure - (a30_pure + a31_pure)};
+
+      const CCTK_REAL b0{b0_pure * dt};
+      const CCTK_REAL b1{b1_pure * dt};
+      const CCTK_REAL b2{b2_pure * dt};
+      const CCTK_REAL b3{b3_pure * dt};
+      const CCTK_REAL a20{a20_pure * dt};
+      const CCTK_REAL a21{a21_pure * dt};
+      const CCTK_REAL a30{a30_pure * dt};
+      const CCTK_REAL a31{a31_pure * dt};
+      const CCTK_REAL a32{a32_pure * dt};
+      // c2 is both the stage time offset and the weight on g1.
+      const CCTK_REAL c2{c2_pure * dt};
+      const CCTK_REAL c3{c3_pure * dt};
+      if (!(c2 > 0))
+        CCTK_ERROR("RK42-IMEX2L solution (1) must open with a positive "
+                   "abscissa");
+
+      const auto old = copy_state(var, make_valid_all());
+      const auto k0 = slot_state(1);
+
+      calcrhs(1);
+      swap_rhs_slots(0, 3);
+      const auto k1 = slot_state(3);
+      const auto g1 =
+          take_dirk(1, gamma_dt, vector<CCTK_REAL>{CCTK_REAL(1), gamma_dt},
+                    vector<const statecomp_t *>{&old, &k1}, true);
+
+      refresh_saved_g(g1);
+      calcupdate(2, c2, 0.0, reals<4>{CCTK_REAL(1), a20, a21, c2},
+                 states<4>{&old, &k0, &k1, &g1});
+      calcrhs(2);
+      swap_rhs_slots(0, 2);
+      const auto k2 = slot_state(2);
+
+      refresh_saved_g(g1);
+      calcupdate(3, c3, 0.0, reals<5>{CCTK_REAL(1), a30, a31, a32, c3},
+                 states<5>{&old, &k0, &k1, &k2, &g1});
+      calcrhs(3);
+      const auto k3 = slot_state(0);
+
+      refresh_saved_g(g1);
+      take_dirk(4, dt,
+                vector<CCTK_REAL>{CCTK_REAL(1), b0, b1, b2, b3,
+                                  implicit_weight},
+                vector<const statecomp_t *>{&old, &k0, &k1, &k2, &k3, &g1},
+                true);
+      swap_rhs_slots(0, 3);
+      invalidate_slots_beyond(depth);
+    }
+
   } else if (CCTK_EQUALS(method, "RK4-3")) {
 
     const int depth = history_depth(method);
@@ -1098,24 +1304,24 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
     };
     const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 3,
                              CCTK_REAL(1) / 3, CCTK_REAL(1) / 6};
-    run_imex(c, a_exp, a_imp, b, b);
+    run_imex(c, c, a_exp, a_imp, b, b);
 
   } else if (CCTK_EQUALS(method, "IMEX32L")) {
 
-    const vector<CCTK_REAL> c{0, 1, CCTK_REAL(1) / 2};
-    const vector<vector<CCTK_REAL> > a_exp{
-        {0, 0, 0},
-        {1, 0, 0},
-        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0},
-    };
-    const vector<vector<CCTK_REAL> > a_imp{
-        {0, 0, 0},
-        {CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 0},
-        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 6, CCTK_REAL(2) / 3},
-    };
-    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 6,
-                             CCTK_REAL(2) / 3};
-    run_imex(c, a_exp, a_imp, b, b);
+    // Pareschi and Russo, J. Sci. Comput. 25 (2005) 129-155, Table 5.
+    vector<CCTK_REAL> c_exp(3), c_imp(3), b(3);
+    vector<vector<CCTK_REAL> > a_exp(3, vector<CCTK_REAL>(3));
+    vector<vector<CCTK_REAL> > a_imp(3, vector<CCTK_REAL>(3));
+    for (int i = 0; i < 3; ++i) {
+      c_exp.at(i) = imex32l_c_exp<CCTK_REAL>(i);
+      c_imp.at(i) = imex32l_c_imp<CCTK_REAL>(i);
+      b.at(i) = imex32l_b<CCTK_REAL>(i);
+      for (int j = 0; j < 3; ++j) {
+        a_exp.at(i).at(j) = imex32l_a_exp<CCTK_REAL>(i, j);
+        a_imp.at(i).at(j) = imex32l_a_imp<CCTK_REAL>(i, j);
+      }
+    }
+    run_imex(c_exp, c_imp, a_exp, a_imp, b, b);
 
   } else if (CCTK_EQUALS(method, "IMEX122") ||
              CCTK_EQUALS(method, "Implicit Euler")) {

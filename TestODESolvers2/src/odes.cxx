@@ -37,12 +37,19 @@ extern "C" void TestODESolvers2_Initial(CCTK_ARGUMENTS) {
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> poly_(cctkGH, poly);
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> exp1_(cctkGH, exp1);
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> exp2_(cctkGH, exp2);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_flux_(cctkGH, y_flux);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_src_(cctkGH, y_src);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_both_(cctkGH, y_both);
 
   Loop::loop_int<1, 1, 1>(cctkGH, [&](const Loop::PointDesc &p) {
     time_(p.I) = cctk_time;
     poly_(p.I) = pow(1 + cctk_time, porder);
     exp1_(p.I) = exp(cctk_time);
     exp2_(p.I) = exp(cctk_time / 2);
+    // y(0) = 1 for every component of the additive split.
+    y_flux_(p.I) = exp(cctk_time);
+    y_src_(p.I) = exp(-cctk_time);
+    y_both_(p.I) = exp(cctk_time / 2);
   });
 }
 
@@ -60,11 +67,16 @@ extern "C" void TestODESolvers2_RHS(CCTK_ARGUMENTS) {
   const Loop::GF3D<const CCTK_REAL, 1, 1, 1> time_(cctkGH, time);
   const Loop::GF3D<const CCTK_REAL, 1, 1, 1> exp1_(cctkGH, exp1);
   const Loop::GF3D<const CCTK_REAL, 1, 1, 1> exp2_(cctkGH, exp2);
+  const Loop::GF3D<const CCTK_REAL, 1, 1, 1> y_flux_(cctkGH, y_flux);
+  const Loop::GF3D<const CCTK_REAL, 1, 1, 1> y_both_(cctkGH, y_both);
 
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> time_rhs_(cctkGH, time_rhs);
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> poly_rhs_(cctkGH, poly_rhs);
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> exp1_rhs_(cctkGH, exp1_rhs);
   const Loop::GF3D<CCTK_REAL, 1, 1, 1> exp2_rhs_(cctkGH, exp2_rhs);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_flux_rhs_(cctkGH, y_flux_rhs);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_src_rhs_(cctkGH, y_src_rhs);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_both_rhs_(cctkGH, y_both_rhs);
 
   Loop::loop_int<1, 1, 1>(cctkGH, [&](const Loop::PointDesc &p) {
     if (porder > 0)
@@ -76,6 +88,40 @@ extern "C" void TestODESolvers2_RHS(CCTK_ARGUMENTS) {
     poly_rhs_(p.I) = porder == 0 ? 0 : porder * pow(1 + cctk_time, porder - 1);
     exp1_rhs_(p.I) = exp1_(p.I);
     exp2_rhs_(p.I) = exp2_(p.I) / 2;
+    // Explicit part only. y_src has none, so an empty implicit step leaves it
+    // at its initial value.
+    y_flux_rhs_(p.I) = y_flux_(p.I);
+    y_src_rhs_(p.I) = 0;
+    y_both_rhs_(p.I) = y_both_(p.I);
+  });
+}
+
+// q_new = q_star + step * beta * q_new, with step = cctk_delta_time.
+// ODESolvers has already stored the stage base in the state.
+CCTK_REAL relax_linear(const CCTK_REAL q_star, const CCTK_REAL beta,
+                       const CCTK_REAL step) {
+  const CCTK_REAL denom = 1 - beta * step;
+  if (!(abs(denom) > 1.0e-12))
+    CCTK_VERROR("Linear implicit solve is singular: beta=%.17g step=%.17g",
+                double(beta), double(step));
+  return q_star / denom;
+}
+
+extern "C" void TestODESolvers2_Implicit(CCTK_ARGUMENTS) {
+  DECLARE_CCTK_ARGUMENTS_TestODESolvers2_Implicit;
+
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_flux_(cctkGH, y_flux);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_src_(cctkGH, y_src);
+  const Loop::GF3D<CCTK_REAL, 1, 1, 1> y_both_(cctkGH, y_both);
+
+  const CCTK_REAL beta_flux = 0;
+  const CCTK_REAL beta_src = -1;
+  const CCTK_REAL beta_both = -CCTK_REAL(0.5);
+
+  Loop::loop_int<1, 1, 1>(cctkGH, [&](const Loop::PointDesc &p) {
+    y_flux_(p.I) = relax_linear(y_flux_(p.I), beta_flux, cctk_delta_time);
+    y_src_(p.I) = relax_linear(y_src_(p.I), beta_src, cctk_delta_time);
+    y_both_(p.I) = relax_linear(y_both_(p.I), beta_both, cctk_delta_time);
   });
 }
 
@@ -108,6 +154,45 @@ extern "C" void TestODESolvers2_Error(CCTK_ARGUMENTS) {
       CCTK_VINFO("exp1_err=%.17g exp2_err=%.17g order=%.17g", double(exp1_err),
                  double(exp2_err), double(exp_order_(p.I)));
     }
+  });
+}
+
+extern "C" void TestODESolvers2_CheckSplit(CCTK_ARGUMENTS) {
+  DECLARE_CCTK_ARGUMENTS_TestODESolvers2_CheckSplit;
+  DECLARE_CCTK_PARAMETERS;
+
+  if (!check_split)
+    return;
+  if (cctk_iteration != cctk_itlast)
+    return;
+  if (cctk_itlast < 8)
+    CCTK_VERROR("check_split needs at least 8 iterations so the multistep "
+                "tableaus run, got cctk_itlast=%d",
+                int(cctk_itlast));
+  if (flux_atol < 0 && source_atol < 0 && both_atol < 0)
+    CCTK_ERROR("check_split is set, but every error bound is negative");
+
+  const Loop::GF3D<const CCTK_REAL, 1, 1, 1> y_flux_(cctkGH, y_flux);
+  const Loop::GF3D<const CCTK_REAL, 1, 1, 1> y_src_(cctkGH, y_src);
+  const Loop::GF3D<const CCTK_REAL, 1, 1, 1> y_both_(cctkGH, y_both);
+
+  Loop::loop_int<1, 1, 1>(cctkGH, [&](const Loop::PointDesc &p) {
+    const auto check_one = [&](const char *const name, const CCTK_REAL got,
+                               const CCTK_REAL exact, const CCTK_REAL bound) {
+      if (bound < 0)
+        return;
+      const CCTK_REAL err = abs(got - exact);
+      if (!(err <= bound))
+        CCTK_VERROR("%s error %.17g exceeds bound %.17g at t=%.17g "
+                    "(value %.17g, exact %.17g)",
+                    name, double(err), double(bound), double(cctk_time),
+                    double(got), double(exact));
+      CCTK_VINFO("%s error %.17g bound %.17g", name, double(err),
+                 double(bound));
+    };
+    check_one("y_flux", y_flux_(p.I), exp(cctk_time), flux_atol);
+    check_one("y_src", y_src_(p.I), exp(-cctk_time), source_atol);
+    check_one("y_both", y_both_(p.I), exp(cctk_time / 2), both_atol);
   });
 }
 

@@ -6,4 +6,9 @@ Licence      : LGPL
 
 1. Purpose
 
-Test the ODESolvers thorn
+Test the ODESolvers thorn.
+
+test-rk4-2, test-rk4-3, test-rk42-imex, test-rk42-imex2l, and test-imex32l
+integrate y' = y, y' = -y, and y' = y - y/2 on one cell. The run aborts
+if the absolute error exceeds the bound in the parameter file. The older
+tests keep their one-step output and leave that check off.

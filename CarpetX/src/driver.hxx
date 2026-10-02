@@ -593,6 +593,36 @@ enum class band_kind { ks_consumer, old_consumer };
 // for ks_consumer, "oldc" for old_consumer. Shared by both IO backends.
 std::string subcycling_band_tag(band_kind kind, int stage = -1);
 
+// RHS history for the multistep RK methods in ODESolvers.
+//
+// interface.ccl TIMELEVELS is a ceiling: it sizes cctkGH->data. How many of
+// those slots hold a MultiFab is active_timelevels, normally taken from
+// STORAGE and then frozen. SetGroupTimelevels is the one later writer. It
+// updates active_timelevels and, once levels exist, the MultiFabs. Shrinking
+// drops slots from the back, so time level 0 stays put.
+//
+// ODESolvers caches raw MultiFab pointers for the duration of a step.
+// SetGroupTimelevels refuses to run while `integrating` is set. Swapping
+// time levels allocates nothing and is meant to run during a step; the caller
+// has to rebuild anything that cached a MultiFab pointer.
+
+int GetGroupTimelevels(int gi);
+int SetGroupTimelevels(int gi, int ntls);
+void SwapGroupTimelevels(int gi, int tl1, int tl2);
+
+extern bool integrating;
+
+class integrating_guard_t {
+public:
+  integrating_guard_t() {
+    assert(!integrating);
+    integrating = true;
+  }
+  integrating_guard_t(const integrating_guard_t &) = delete;
+  integrating_guard_t &operator=(const integrating_guard_t &) = delete;
+  ~integrating_guard_t() { integrating = false; }
+};
+
 } // namespace CarpetX
 
 #endif // #ifndef CARPETX_CARPETX_DRIVER_HXX

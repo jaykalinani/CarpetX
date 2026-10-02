@@ -1145,6 +1145,133 @@ void GHExt::PatchData::LevelData::GroupData::free_tmp_mfabs() const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool integrating = false;
+
+namespace {
+std::unique_ptr<amrex::MultiFab>
+clone_group_mfab(const GHExt::PatchData::LevelData &leveldata,
+                 const GHExt::PatchData::LevelData::GroupData &groupdata) {
+  if (!groupdata.mfab.empty() && groupdata.mfab.at(0)) {
+    const amrex::MultiFab &mfab0 = *groupdata.mfab.at(0);
+    return std::make_unique<amrex::MultiFab>(mfab0.boxArray(),
+                                             mfab0.DistributionMap(),
+                                             mfab0.nComp(), mfab0.nGrowVect());
+  }
+  const amrex::BoxArray gba = amrex::convert(
+      leveldata.fab->boxArray(),
+      amrex::IndexType(
+          groupdata.indextype[0] ? amrex::IndexType::CELL
+                                 : amrex::IndexType::NODE,
+          groupdata.indextype[1] ? amrex::IndexType::CELL
+                                 : amrex::IndexType::NODE,
+          groupdata.indextype[2] ? amrex::IndexType::CELL
+                                 : amrex::IndexType::NODE));
+  return std::make_unique<amrex::MultiFab>(
+      gba, leveldata.fab->DistributionMap(), groupdata.numvars,
+      amrex::IntVect(groupdata.nghostzones));
+}
+} // namespace
+
+int GetGroupTimelevels(const int gi) {
+  assert(ghext);
+  assert(gi >= 0 && gi < int(ghext->active_timelevels.size()));
+  assert(CCTK_GroupTypeI(gi) == CCTK_GF);
+  return ghext->active_timelevels.at(gi);
+}
+
+int SetGroupTimelevels(const int gi, const int ntls) {
+  assert(ghext);
+  assert(gi >= 0 && gi < int(ghext->active_timelevels.size()));
+
+  if (CCTK_GroupTypeI(gi) != CCTK_GF)
+    CCTK_VERROR("SetGroupTimelevels: group \"%s\" is not a grid function "
+                "group; only grid functions live on levels",
+                CCTK_FullGroupName(gi));
+  const int declared_ntls = CCTK_DeclaredTimeLevelsGI(gi);
+  if (ntls < 1 || ntls > declared_ntls)
+    CCTK_VERROR("SetGroupTimelevels: cannot allocate %d time levels for group "
+                "\"%s\", which declares %d. cctkGH->data is sized from the "
+                "declaration and cannot grow; write TIMELEVELS=%d in the "
+                "group's interface.ccl.",
+                ntls, CCTK_FullGroupName(gi), declared_ntls, ntls);
+
+  const int old_ntls = ghext->active_timelevels.at(gi);
+  if (ntls == old_ntls)
+    return old_ntls;
+  if (integrating)
+    CCTK_VERROR("SetGroupTimelevels: cannot change the number of time levels "
+                "of group \"%s\" while a state vector is being integrated; "
+                "the integrator caches pointers to the time levels for the "
+                "duration of a step",
+                CCTK_FullGroupName(gi));
+
+  ghext->active_timelevels.at(gi) = ntls;
+
+  const std::string why_str = [&]() {
+    std::ostringstream buf;
+    buf << "SetGroupTimelevels " << CCTK_FullGroupName(gi) << " from "
+        << old_ntls << " to " << ntls << " time levels";
+    return buf.str();
+  }();
+  const std::function<std::string()> why = [why_str]() { return why_str; };
+
+  for (auto &patchdata : ghext->patchdata) {
+    for (auto &leveldata : patchdata.leveldata) {
+      auto &restrict groupdata = *leveldata.groupdata.at(gi);
+      assert(int(groupdata.mfab.size()) == old_ntls);
+      assert(int(groupdata.valid.size()) == old_ntls);
+
+      if (ntls < old_ntls) {
+        groupdata.mfab.resize(ntls);
+        groupdata.valid.resize(ntls);
+      } else {
+        groupdata.mfab.reserve(ntls);
+        for (int tl = old_ntls; tl < ntls; ++tl)
+          groupdata.mfab.push_back(clone_group_mfab(leveldata, groupdata));
+        groupdata.valid.resize(
+            ntls, std::vector<why_valid_t>(groupdata.numvars, why_valid_t(why)));
+      }
+
+      update_group_pointers(leveldata, gi);
+
+      if (ntls > old_ntls && !leveldata.local_cctkGHs.empty()) {
+        const active_levels_t active_level(leveldata.level, leveldata.level + 1,
+                                           patchdata.patch, patchdata.patch + 1);
+        for (int tl = old_ntls; tl < ntls; ++tl)
+          for (int vi = 0; vi < groupdata.numvars; ++vi)
+            poison_invalid_gf(active_level, gi, vi, tl);
+      }
+    }
+  }
+
+  return old_ntls;
+}
+
+void SwapGroupTimelevels(const int gi, const int tl1, const int tl2) {
+  assert(ghext);
+  assert(gi >= 0 && gi < int(ghext->active_timelevels.size()));
+  assert(CCTK_GroupTypeI(gi) == CCTK_GF);
+  const int ntls = ghext->active_timelevels.at(gi);
+  assert(tl1 >= 0 && tl1 < ntls);
+  assert(tl2 >= 0 && tl2 < ntls);
+  if (tl1 == tl2)
+    return;
+
+  // Only the levels currently being traversed. A step on one batch must not
+  // reorder the history of another batch.
+  assert(active_levels);
+  active_levels->loop_serially([&](auto &restrict leveldata) {
+    auto &restrict groupdata = *leveldata.groupdata.at(gi);
+    assert(int(groupdata.mfab.size()) == ntls);
+    using std::swap;
+    swap(groupdata.mfab.at(tl1), groupdata.mfab.at(tl2));
+    swap(groupdata.valid.at(tl1), groupdata.valid.at(tl2));
+    update_group_pointers(leveldata, gi);
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 bool GHExt::PatchData::LevelData::GroupData::
     all_faces_have_symmetries_or_boundaries() const {
   const auto &symmetries = ghext->patchdata.at(patch).symmetries;

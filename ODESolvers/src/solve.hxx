@@ -88,9 +88,22 @@ struct statecomp_t {
 
   vector<GHExt::PatchData::LevelData::GroupData *> groupdatas;
   vector<amrex::MultiFab *> mfabs;
-  // Timelevel of every mfab/groupdata entry. Subcycling aliases the previous
-  // step at tl=1; all other paths use tl=0.
+  // Per-component time level. Empty means every component uses `timelevel`
+  // (subcycling aliases the previous step at tl=1; other paths use tl=0).
+  // The multistep RK methods fill this so each RHS slot has its own level.
+  vector<int> tls;
   int timelevel = 0;
+
+  int timelevel_at(const std::size_t n) const {
+    if (tls.empty())
+      return timelevel;
+    return tls.at(n);
+  }
+
+  void push_component(GHExt::PatchData::LevelData::GroupData *groupdata,
+                      int tl);
+  void push_component(GHExt::PatchData::LevelData::GroupData *groupdata, int tl,
+                      amrex::MultiFab *mfab);
 
   static void init_tmp_mfabs();
   static void free_tmp_mfabs();

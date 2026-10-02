@@ -1,28 +1,37 @@
 # Schedule definitions for thorn TestODESolvers2
 
-STORAGE: state rhs error order
+STORAGE: state rhs[1] error order ode ode_rhs[1]
 
 
 
 SCHEDULE TestODESolvers2_Initial AT initial
 {
   LANG: C
-  WRITES: state(interior)
+  WRITES: state(interior) ode(interior)
   SYNC: state
+  SYNC: ode
 } "Initialize state vector"
 
 SCHEDULE TestODESolvers2_RHS IN ODESolvers_RHS
 {
   LANG: C
-  READS: state(interior)
-  WRITES: rhs(interior)
+  READS: state(interior) ode(interior)
+  WRITES: rhs(interior) ode_rhs(interior)
 } "RHS function"
+
+SCHEDULE TestODESolvers2_Implicit IN ODESolvers_ImplicitStep
+{
+  LANG: C
+  READS: ode(interior)
+  WRITES: ode(interior)
+} "Solve the linear implicit part of the additive split"
 
 SCHEDULE TestODESolvers2_Boundary IN ODESolvers_PostStep
 {
   LANG: C
   OPTIONS: global
   SYNC: state
+  SYNC: ode
 } "Apply boundary conditions to state vector"
 
 SCHEDULE TestODESolvers2_Error AT analysis
@@ -32,3 +41,9 @@ SCHEDULE TestODESolvers2_Error AT analysis
   WRITES: error(interior) order(interior)
   SYNC: error order
 } "Calculate error in state vector"
+
+SCHEDULE TestODESolvers2_CheckSplit AT analysis AFTER TestODESolvers2_Error
+{
+  LANG: C
+  READS: ode(interior)
+} "Abort if the additive split misses its error bound"

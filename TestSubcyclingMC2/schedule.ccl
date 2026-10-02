@@ -1,6 +1,6 @@
 # Schedule definitions for thorn TestSubcyclingMC2
 
-STORAGE: state[timelevels] rhs error
+STORAGE: state[timelevels] rhs[1] error
 
 
 SCHEDULE TestSubcyclingMC2_MoveBox AT postinitial BEFORE EstimateError

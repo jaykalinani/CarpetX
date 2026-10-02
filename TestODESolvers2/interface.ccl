@@ -6,7 +6,13 @@ USES INCLUDE HEADER: loop.hxx
 
 CCTK_REAL state TYPE=gf CENTERING={ccc} TAGS='rhs="rhs"' { time poly exp1 exp2 } "State"
 
-CCTK_REAL rhs TYPE=gf CENTERING={ccc} TAGS='checkpoint="no"' { time_rhs poly_rhs exp1_rhs exp2_rhs } "RHS"
+CCTK_REAL rhs TIMELEVELS=4 TYPE=gf CENTERING={ccc} TAGS='checkpoint="no"' { time_rhs poly_rhs exp1_rhs exp2_rhs } "RHS"
+
+# y_flux is y' = y. y_src is y' = -y, with a zero explicit part.
+# y_both is y' = y - y/2. The implicit part is applied by TestODESolvers2_Implicit.
+CCTK_REAL ode TYPE=gf CENTERING={ccc} TAGS='rhs="ode_rhs"' { y_flux y_src y_both } "Additive split"
+
+CCTK_REAL ode_rhs TIMELEVELS=4 TYPE=gf CENTERING={ccc} TAGS='checkpoint="no"' { y_flux_rhs y_src_rhs y_both_rhs } "RHS of the additive split"
 
 CCTK_REAL error TYPE=gf CENTERING={ccc} TAGS='checkpoint="no"' { time_err poly_err } "Error"
 

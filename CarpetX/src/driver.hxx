@@ -61,6 +61,7 @@ enum class boundary_t {
   linear_extrapolation,
   neumann,
   robin,
+  cartoon,
 };
 std::ostream &operator<<(std::ostream &os, const boundary_t boundary);
 
@@ -449,6 +450,7 @@ struct GHExt {
 
         std::array<std::array<boundary_t, dim>, 2> boundaries;
         bool all_faces_have_symmetries_or_boundaries() const;
+        bool has_cartoon_boundary() const;
         std::vector<array<int, dim> > parities;
         std::vector<CCTK_REAL> dirichlet_values;
         std::vector<CCTK_REAL> robin_values;

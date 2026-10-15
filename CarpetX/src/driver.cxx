@@ -942,11 +942,13 @@ void GHExt::PatchData::LevelData::build_cf_mask(
   if (level == 0 || !ghext->use_subcycling)
     return;
 
+  const amrex::IntVect ng(nghostzones[0], nghostzones[1], nghostzones[2]);
   const int s = (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
-  if (cf_masks[s])
+  const std::array<int, 4> key{s, ng[0], ng[1], ng[2]};
+  if (const auto it = cf_masks.find(key);
+      it != cf_masks.end() && it->second)
     return; // already built (idempotent: warm-up runs every step)
 
-  const amrex::IntVect ng(nghostzones[0], nghostzones[1], nghostzones[2]);
   const amrex::BoxArray gba = amrex::convert(
       fab->boxArray(),
       amrex::IndexType(
@@ -968,7 +970,7 @@ void GHExt::PatchData::LevelData::build_cf_mask(
                   /*notcovered=*/cf_ghost,
                   /*physbnd=*/0,
                   /*interior=*/0);
-  cf_masks[s] = std::move(mask);
+  cf_masks[key] = std::move(mask);
 }
 
 amrex::iMultiFab *GHExt::PatchData::LevelData::get_cf_mask(
@@ -982,12 +984,13 @@ amrex::iMultiFab *GHExt::PatchData::LevelData::get_cf_mask(
 
   const int s = (indextype[0] << 2) | (indextype[1] << 1) | indextype[2];
   const amrex::IntVect ng(nghostzones[0], nghostzones[1], nghostzones[2]);
-  // Slot must be warm (build_cf_mask ran single-threaded). Sharing assumption:
-  // all groups of this centering at this level use the same nghostzones; if the
-  // nGrowVect check trips, widen the cache key from `centering` to
-  // `(centering, nghost)` inside build_cf_mask.
-  assert(cf_masks[s] && cf_masks[s]->nGrowVect() == ng);
-  return cf_masks[s].get();
+  const std::array<int, 4> key{s, ng[0], ng[1], ng[2]};
+  // The exact key must be warm; build_cf_mask runs single-threaded before
+  // parallel readers enter this pure lookup.
+  const auto it = cf_masks.find(key);
+  assert(it != cf_masks.end() && it->second &&
+         it->second->nGrowVect() == ng);
+  return it->second.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

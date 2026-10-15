@@ -22,6 +22,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -381,10 +382,11 @@ struct GHExt {
       // and its distribution over all processes, but holds no data.
       std::unique_ptr<amrex::FabArrayBase> fab;
 
-      // Per-centering coarse-fine ghost masks, built single-threaded by
-      // build_cf_mask and read by get_cf_mask.
-      // Indexed by (indextype[0]<<2)|(indextype[1]<<1)|indextype[2].
-      mutable std::array<std::unique_ptr<amrex::iMultiFab>, 8> cf_masks;
+      // Coarse-fine ghost masks, built single-threaded by build_cf_mask and
+      // read by get_cf_mask. Keyed by centering and ghost width: groups with
+      // the same centering can legitimately request different halo widths.
+      mutable std::map<std::array<int, 4>, std::unique_ptr<amrex::iMultiFab>>
+          cf_masks;
 
       // Per-centering coarse-fine boundary-band geometry for subcycling RK
       // k-stages, built lazily by build_bands and used to allocate the

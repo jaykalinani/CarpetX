@@ -89,9 +89,22 @@ struct statecomp_t {
 
   vector<GHExt::PatchData::LevelData::GroupData *> groupdatas;
   vector<amrex::MultiFab *> mfabs;
-  // Timelevel of every mfab/groupdata entry. Subcycling aliases the previous
-  // step at tl=1; all other paths use tl=0.
+  // Per-component time level. Empty means every component uses `timelevel`
+  // (subcycling aliases the previous step at tl=1; other paths use tl=0).
+  // The multistep RK methods fill this so each RHS slot has its own level.
+  vector<int> tls;
   int timelevel = 0;
+
+  int timelevel_at(const std::size_t n) const {
+    if (tls.empty())
+      return timelevel;
+    return tls.at(n);
+  }
+
+  void push_component(GHExt::PatchData::LevelData::GroupData *groupdata,
+                      int tl);
+  void push_component(GHExt::PatchData::LevelData::GroupData *groupdata, int tl,
+                      amrex::MultiFab *mfab);
 
   static void init_tmp_mfabs();
   static void free_tmp_mfabs();
@@ -233,6 +246,13 @@ inline std::vector<int> get_group_dependents(const int gi) {
 
   return dependents;
 }
+
+// Defined in odesolvers_solve.cxx. method and rhs_timelevels are steerable,
+// so both drivers call this again before they cache MultiFab pointers.
+// requested == 0 allocates the minimum for method. A positive value must
+// be at least that minimum and at most the group's TIMELEVELS declaration.
+void setup_rhs_storage(const char *method, int requested, bool verbose,
+                       bool use_subcycling);
 
 // Mark groups as invalid
 inline void mark_invalid(const std::vector<int> &groups) {

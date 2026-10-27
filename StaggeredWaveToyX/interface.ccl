@@ -30,23 +30,23 @@ CCTK_REAL fzstate TYPE=gf CENTERING={vvc} TAGS='parities={+1 +1 -1} rhs="fzrhs" 
 
 
 
-CCTK_REAL urhs TYPE=gf CENTERING={vvv} TAGS='checkpoint="no"'
+CCTK_REAL urhs TIMELEVELS=4 TYPE=gf CENTERING={vvv} TAGS='checkpoint="no"'
 {
   u_rhs
   ft_rhs
 } "Scalar wave rhs"
 
-CCTK_REAL fxrhs TYPE=gf CENTERING={cvv} TAGS='parities={-1 +1 +1} checkpoint="no"'
+CCTK_REAL fxrhs TIMELEVELS=4 TYPE=gf CENTERING={cvv} TAGS='parities={-1 +1 +1} checkpoint="no"'
 {
   fx_rhs
 } "Scalar wave rhs, staggered in x direction"
 
-CCTK_REAL fyrhs TYPE=gf CENTERING={vcv} TAGS='parities={+1 -1 +1} checkpoint="no"'
+CCTK_REAL fyrhs TIMELEVELS=4 TYPE=gf CENTERING={vcv} TAGS='parities={+1 -1 +1} checkpoint="no"'
 {
   fy_rhs
 } "Scalar wave rhs, staggered in y direction"
 
-CCTK_REAL fzrhs TYPE=gf CENTERING={vvc} TAGS='parities={+1 +1 -1} checkpoint="no"'
+CCTK_REAL fzrhs TIMELEVELS=4 TYPE=gf CENTERING={vvc} TAGS='parities={+1 +1 -1} checkpoint="no"'
 {
   fz_rhs
 } "Scalar wave rhs, staggered in z direction"

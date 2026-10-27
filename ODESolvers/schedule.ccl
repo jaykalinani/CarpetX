@@ -10,6 +10,12 @@ SCHEDULE ODESolvers_InitConstants AT WRAGH
   WRITES: do_substeps
 } "Set up dummy loop counters for schedule printout"
 
+SCHEDULE ODESolvers_SetupStorage AT WRAGH AFTER ODESolvers_InitConstants
+{
+  LANG: C
+  OPTIONS: global
+} "Request the RHS time levels the selected method needs"
+
 if(use_subcycling) {
 
   SCHEDULE ODESolvers_Solve_Subcycling AT evol

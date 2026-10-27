@@ -4,3 +4,26 @@ CCTK_INT porder "Order of polynomial"
 {
   0:* :: ""
 } 2
+
+BOOLEAN check_split "At the last iteration, require the additive split to meet its error bounds"
+{
+} "no"
+
+CCTK_REAL flux_atol "Absolute error bound for y_flux (y' = y). Negative skips that check."
+{
+  *:* :: ""
+} -1
+
+CCTK_REAL source_atol "Absolute error bound for y_src (y' = -y). Negative skips that check."
+{
+  *:* :: ""
+} -1
+
+CCTK_REAL both_atol "Absolute error bound for y_both (y' = y - y/2). Negative skips that check."
+{
+  *:* :: ""
+} -1
+
+SHARES: Cactus
+
+USES CCTK_INT cctk_itlast

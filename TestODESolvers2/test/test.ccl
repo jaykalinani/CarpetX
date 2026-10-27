@@ -1,4 +1,5 @@
 NPROCS 1
+EXTENSIONS tsv
 
 TEST test-dp87
 {

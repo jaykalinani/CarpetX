@@ -51,7 +51,7 @@ struct rk_method_t {
 // error-estimate stages are commented out there), DP87 the 13-stage one; both
 // exceed max_num_rk_stages, so their b stays in the local tableau and they
 // are not available under subcycling.
-inline constexpr std::array<rk_method_t, 13> rk_methods{{
+inline constexpr std::array<rk_method_t, 17> rk_methods{{
     {"constant", 4, true, true, true, {0, 0, 0, 0}},
     {"Euler", 1, false, true, true, {1, 0, 0, 0}},
     {"RK2", 2, false, true, true, {0, 1, 0, 0}},
@@ -60,6 +60,14 @@ inline constexpr std::array<rk_method_t, 13> rk_methods{{
     {"RK4", 4, true, true, true, {1.0 / 6, 1.0 / 3, 1.0 / 3, 1.0 / 6}},
     {"semi-implicit", 4, true, true, true,
      {1.0 / 6, 1.0 / 3, 1.0 / 3, 1.0 / 6}},
+    // Multistep methods keep part of the update in RHS time levels from
+    // earlier steps, so one b row cannot feed a flux register. Subcycling
+    // is refused in the solvers. nstages is 4 because a missing history
+    // takes a classic RK4 step and calls AccumulateFluxes with stage 4.
+    {"RK4-2", 4, false, false, false, {0, 0, 0, 0}},
+    {"RK4-3", 4, false, false, false, {0, 0, 0, 0}},
+    {"RK42-IMEX", 4, false, false, false, {0, 0, 0, 0}},
+    {"RK42-IMEX2L", 4, false, false, false, {0, 0, 0, 0}},
     {"RKF78", 11, false, true, false, {0, 0, 0, 0}},
     {"DP87", 13, false, true, false, {0, 0, 0, 0}},
     {"IMEX42L", 4, true, true, true,

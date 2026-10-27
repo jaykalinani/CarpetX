@@ -42,10 +42,41 @@ void statecomp_t::free_tmp_mfabs() {
   });
 }
 
+void check_timelevel(
+    const CarpetX::GHExt::PatchData::LevelData::GroupData &groupdata,
+    const int tl) {
+  assert(groupdata.mfab.size() == groupdata.valid.size());
+  if (tl < 0 || tl >= int(groupdata.valid.size()))
+    CCTK_VERROR("ODESolvers addressed time level %d of group %s, which has %d "
+                "time level(s) allocated. The number of allocated time levels "
+                "is chosen by CarpetX::SetGroupTimelevels and is capped by the "
+                "group's TIMELEVELS declaration in its interface.ccl.",
+                tl, groupdata.groupname.c_str(), int(groupdata.valid.size()));
+}
+
+void statecomp_t::push_component(
+    GHExt::PatchData::LevelData::GroupData *const groupdata, const int tl) {
+  assert(groupdata);
+  check_timelevel(*groupdata, tl);
+  push_component(groupdata, tl, groupdata->mfab.at(tl).get());
+}
+
+void statecomp_t::push_component(
+    GHExt::PatchData::LevelData::GroupData *const groupdata, const int tl,
+    amrex::MultiFab *const mfab) {
+  assert(groupdata);
+  assert(mfab);
+  check_timelevel(*groupdata, tl);
+  groupdatas.push_back(groupdata);
+  mfabs.push_back(mfab);
+  tls.push_back(tl);
+}
+
 // State that the state vector has valid data in the interior
 void statecomp_t::set_valid(const valid_t valid) const {
-  const int tl = this->timelevel;
-  for (auto groupdata : groupdatas) {
+  for (size_t n = 0; n < groupdatas.size(); ++n) {
+    const int tl = timelevel_at(n);
+    const auto groupdata = groupdatas.at(n);
     for (int vi = 0; vi < groupdata->numvars; ++vi) {
       groupdata->valid.at(tl).at(vi).set_int(valid.valid_int, [=]() {
         std::ostringstream buf;
@@ -94,9 +125,9 @@ void statecomp_t::combine_valids(const statecomp_t &dst, const CCTK_REAL scale,
     }
   }
 
-  const int dst_tl = dst.timelevel;
   for (int group = 0; group < ngroups; ++group) {
     const auto &dstgroup = dst.groupdatas.at(group);
+    const int dst_tl = dst.timelevel_at(group);
     const int nvars = dstgroup->numvars;
     for (int vi = 0; vi < nvars; ++vi) {
       CarpetX::valid_t valid = where;
@@ -109,7 +140,7 @@ void statecomp_t::combine_valids(const statecomp_t &dst, const CCTK_REAL scale,
         if (factors.at(m) != 0) {
           const auto &src = srcs.at(m);
           const auto &srcgroup = src->groupdatas.at(group);
-          valid &= srcgroup->valid.at(src->timelevel).at(vi).get();
+          valid &= srcgroup->valid.at(src->timelevel_at(group)).at(vi).get();
           did_set_valid = true;
         }
       }
@@ -124,8 +155,9 @@ void statecomp_t::combine_valids(const statecomp_t &dst, const CCTK_REAL scale,
 // Ensure a state vector has valid data in the interior
 void statecomp_t::check_valid(const valid_t required,
                               const function<string()> &why) const {
-  const int tl = this->timelevel;
-  for (const auto groupdata : groupdatas) {
+  for (size_t n = 0; n < groupdatas.size(); ++n) {
+    const int tl = timelevel_at(n);
+    const auto groupdata = groupdatas.at(n);
     for (int vi = 0; vi < groupdata->numvars; ++vi) {
       CarpetX::error_if_invalid(*groupdata, vi, tl, required, why);
       // TODO: Parallelize over pathces, levels, group, variables, and
@@ -144,6 +176,7 @@ statecomp_t statecomp_t::copy(const CarpetX::valid_t where) const {
   const std::size_t size = mfabs.size();
   statecomp_t result;
   result.timelevel = this->timelevel;
+  result.tls = this->tls;
   result.groupdatas.reserve(size);
   result.mfabs.reserve(size);
   for (std::size_t n = 0; n < size; ++n) {
@@ -237,7 +270,6 @@ void statecomp_t::lincomb(const statecomp_t &dst, const CCTK_REAL scale,
       const std::ptrdiff_t nstride = dstvar.nstride;
 #endif
       const std::ptrdiff_t npoints = nstride * ncomps;
-
       CCTK_REAL *restrict const dstptr = dstvar.dataPtr();
       std::array<const CCTK_REAL *restrict, N> srcptrs;
       for (std::size_t n = 0; n < N; ++n)

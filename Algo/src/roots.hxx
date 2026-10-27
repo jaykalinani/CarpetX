@@ -9,6 +9,7 @@
 
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/tools/roots.hpp>
+#include <boost/version.hpp>
 
 #ifdef __HIPCC__
 #include <hip/hip_runtime.h>
@@ -325,7 +326,12 @@ T schroder(F &&f, T guess, T min, T max, int min_bits, int max_iters,
   }
   std::uintmax_t max_iter = max_iters;
   try {
+    // Boost 1.66 renamed schroeder_iterate to schroder_iterate.
+#if BOOST_VERSION < 106600
+    auto res = boost::math::tools::schroeder_iterate(
+#else
     auto res = boost::math::tools::schroder_iterate(
+#endif
         std::forward<F>(f), guess, min, max, min_bits, max_iter);
     iters = max_iter;
     return res;

@@ -13,7 +13,7 @@ CCTK_REAL state TYPE=gf TAGS='rhs="rhs" dependents="energy error"'
   rho
 } "Scalar wave state vector"
 
-CCTK_REAL rhs TYPE=gf TAGS='checkpoint="no"'
+CCTK_REAL rhs TIMELEVELS=4 TYPE=gf TAGS='checkpoint="no"'
 {
   u_rhs
   rho_rhs

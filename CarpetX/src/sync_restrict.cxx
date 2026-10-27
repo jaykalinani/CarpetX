@@ -21,6 +21,17 @@
 
 namespace CarpetX {
 
+// How many leading time levels a sync touches.
+// Evolved groups skip the oldest level. A non-evolved group with extra
+// levels is holding RHS history; only its current level is a stencil input.
+inline int synced_timelevels(
+    const GHExt::PatchData::LevelData::GroupData &groupdata) {
+  const int ntls = int(groupdata.mfab.size());
+  if (!groupdata.do_evolve)
+    return ntls == 0 ? 0 : 1;
+  return ntls > 1 ? ntls - 1 : ntls;
+}
+
 // Forward declaration for the 3-arg Restrict wrapper, defined later in this
 // TU. SyncGroupsByDirI's restrict_during_sync branch calls it, but to keep
 // the top-down order (helpers → Sync* → Reflux → Restrict*) the definition
@@ -105,8 +116,7 @@ static void sync_multipatch_postcheck(const cGH *cctkGH,
       // If there is more than one time level, then we don't sync the
       // oldest.
       // TODO: during evolution, sync only one time level
-      const int ntls0 = groupdata0.mfab.size();
-      const int sync_tl0 = ntls0 > 1 ? ntls0 - 1 : ntls0;
+      const int sync_tl0 = synced_timelevels(groupdata0);
 
       for (int tl = 0; tl < sync_tl0; ++tl)
         for (int vi = 0; vi < groupdata0.numvars; ++vi)
@@ -190,7 +200,7 @@ SyncGroupsByDirIProlongateOnly_impl(const cGH *restrict cctkGH, int numgroups,
       const int ntls = groupdata.mfab.size();
       const int tl_lo = (tl_arg < 0) ? 0 : tl_arg;
       const int tl_hi =
-          (tl_arg < 0) ? (ntls > 1 ? ntls - 1 : ntls) : (tl_arg + 1);
+          (tl_arg < 0) ? synced_timelevels(groupdata) : (tl_arg + 1);
       assert(tl_lo >= 0 && tl_hi <= ntls);
 
       if (leveldata.level == 0) {
@@ -322,8 +332,7 @@ int SyncGroupsByDirI(const cGH *restrict cctkGH, int numgroups,
     // If there is more than one time level, then we don't sync the
     // oldest.
     // TODO: during evolution, sync only one time level
-    const int ntls0 = groupdata0.mfab.size();
-    const int sync_tl0 = ntls0 > 1 ? ntls0 - 1 : ntls0;
+    const int sync_tl0 = synced_timelevels(groupdata0);
 
     active_levels->loop_serially([&](auto &restrict leveldata) {
       auto &restrict groupdata = *leveldata.groupdata.at(gi);
@@ -395,8 +404,7 @@ int SyncGroupsByDirI(const cGH *restrict cctkGH, int numgroups,
       // If there is more than one time level, then we don't sync the
       // oldest.
       // TODO: during evolution, sync only one time level
-      const int ntls = groupdata.mfab.size();
-      const int sync_tl = ntls > 1 ? ntls - 1 : ntls;
+      const int sync_tl = synced_timelevels(groupdata);
 
       // const int level = leveldata.level;
       // const auto &restrict coarseleveldata =
@@ -473,8 +481,7 @@ int SyncGroupsByDirI(const cGH *restrict cctkGH, int numgroups,
     // If there is more than one time level, then we don't sync the
     // oldest.
     // TODO: during evolution, sync only one time level
-    const int ntls0 = groupdata0.mfab.size();
-    const int sync_tl0 = ntls0 > 1 ? ntls0 - 1 : ntls0;
+    const int sync_tl0 = synced_timelevels(groupdata0);
 
     active_levels->loop_serially([&](auto &restrict leveldata) {
       auto &restrict groupdata = *leveldata.groupdata.at(gi);
@@ -554,8 +561,7 @@ int SyncGroupsByDirISubcycling(const cGH *restrict cctkGH, int numgroups,
       // If there is more than one time level, then we don't sync the
       // oldest.
       // TODO: during evolution, sync only one time level
-      const int ntls = groupdata.mfab.size();
-      const int sync_tl = ntls > 1 ? ntls - 1 : ntls;
+      const int sync_tl = synced_timelevels(groupdata);
 
       if (leveldata.level == 0) {
         // Copy from adjacent boxes on same level
@@ -663,8 +669,7 @@ int SyncGroupsByDirISubcycling(const cGH *restrict cctkGH, int numgroups,
     // If there is more than one time level, then we don't sync the
     // oldest.
     // TODO: during evolution, sync only one time level
-    const int ntls0 = groupdata0.mfab.size();
-    const int sync_tl0 = ntls0 > 1 ? ntls0 - 1 : ntls0;
+    const int sync_tl0 = synced_timelevels(groupdata0);
 
     active_levels->loop_serially([&](auto &restrict leveldata) {
       auto &restrict groupdata = *leveldata.groupdata.at(gi);
@@ -766,7 +771,7 @@ int SyncGroupsByDirIGhostOnly(const cGH *restrict cctkGH, int numgroups,
       const int ntls = groupdata.mfab.size();
       const int tl_lo = (tl_arg < 0) ? 0 : tl_arg;
       const int tl_hi =
-          (tl_arg < 0) ? (ntls > 1 ? ntls - 1 : ntls) : (tl_arg + 1);
+          (tl_arg < 0) ? synced_timelevels(groupdata) : (tl_arg + 1);
       assert(tl_lo >= 0 && tl_hi <= ntls);
 
       // Copy from adjacent boxes on same level

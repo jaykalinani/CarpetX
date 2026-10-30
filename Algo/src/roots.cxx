@@ -146,8 +146,9 @@ extern "C" void Test_roots(CCTK_ARGUMENTS) {
 
     // ...and when it decides it sits at a local minimum rather than a root.
     auto noroot = [](CCTK_REAL x) { return std::make_tuple(x * x + 1, 2 * x); };
-    newton_raphson(noroot, 1.0, -10.0, 10.0, minbits, maxiters, iters, failed);
-    assert(failed);
+    auto xnoroot =
+        newton_raphson(noroot, 1.0, -10.0, 10.0, minbits, maxiters, iters, failed);
+    assert(failed && xnoroot == 1.0);
     auto noroot2 = [](CCTK_REAL x) {
       return std::make_tuple(x * x + 1, 2 * x, 2);
     };
@@ -155,6 +156,35 @@ extern "C" void Test_roots(CCTK_ARGUMENTS) {
     assert(failed);
     schroder(noroot2, 1.0, -10.0, 10.0, minbits, maxiters, iters, failed);
     assert(failed);
+
+    // A large scale makes |f| look big at a correctly rounded root. The
+    // Newton step |f/f'| is still inside the x tolerance, so this succeeds.
+    // The x^2+1 case above is the one that must still fail.
+    auto steep = [](CCTK_REAL x) {
+      return std::make_tuple(1.0e10 * (x * x - 2), 1.0e10 * (2 * x));
+    };
+    newton_raphson(steep, 1.0, 0.0, 10.0, minbits, maxiters, iters, failed);
+    assert(!failed);
+    auto steep2 = [](CCTK_REAL x) {
+      return std::make_tuple(1.0e10 * (x * x - 2), 1.0e10 * (2 * x),
+                             1.0e10 * 2);
+    };
+    halley(steep2, 1.0, 0.0, 10.0, minbits, maxiters, iters, failed);
+    assert(!failed);
+    schroder(steep2, 1.0, 0.0, 10.0, minbits, maxiters, iters, failed);
+    assert(!failed);
+
+    // A coarse digit request stops short of the root with both samples
+    // of x^2-2 still positive. The Newton step is inside the tolerance.
+    newton_raphson(fnd, 1.0, 0.0, 10.0, 20, maxiters, iters, failed);
+    assert(!failed);
+
+    // A triple root is inside the step tolerance long before f hits zero.
+    auto cube = [](CCTK_REAL x) {
+      return std::make_tuple(x * x * x, CCTK_REAL(3) * x * x);
+    };
+    newton_raphson(cube, 1.0, -2.0, 2.0, minbits, maxiters, iters, failed);
+    assert(!failed);
 
     // An interval with no sign change is a failure, not an exception.
     bisect(fn, 2.0, 3.0, minbits, maxiters, iters, failed);

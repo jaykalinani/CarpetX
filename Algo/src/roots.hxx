@@ -9,6 +9,7 @@
 
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/tools/roots.hpp>
+#include <boost/version.hpp>
 
 #ifdef __HIPCC__
 #include <hip/hip_runtime.h>
@@ -19,6 +20,7 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <tuple>
 #include <utility>
 
 // For accelerators: Declare whether a function should live on the device or the
@@ -264,6 +266,38 @@ brent(F f, T a, T b, int min_bits, int max_iters, int &iters, bool &failed) {
   return {min(a, b), max(a, b)};
 }
 
+namespace {
+// Boost's loop stops when the step just taken satisfies
+// |Δx| <= |x| * 2^(1-min_bits), or when the budget runs out. Old Boost
+// then returns a local extremum; 1.72 and later raise evaluation_error.
+// Comparing |f| itself to the step tolerance rejects a correctly rounded
+// root of a steep function, so the test uses the Newton step.
+//
+// (|x|+1) * 2^(1-min_bits) is a relative tolerance with an absolute floor,
+// so a root at zero is not required to hit f == 0 in roundoff. A local
+// extremum such as x^2+1 has a vanishing derivative, so its Newton step is
+// not small. A stationary point that is already inside this tolerance is
+// not a separate failure: a well as shallow as x^2+1e-20 has the same
+// Newton step as a multiple root.
+template <typename F, typename T>
+bool boost_iterate_missed_root(F &&fn, T res, int min_bits) {
+  using std::abs;
+  using std::get;
+  using std::isfinite;
+  using std::ldexp;
+  const auto derivs = fn(res);
+  const T fv = get<0>(derivs);
+  if (fv == T(0))
+    return false;
+  const T df = get<1>(derivs);
+  if (!isfinite(fv) || !isfinite(df) || !(abs(df) > T(0)))
+    return true;
+  const T step = fv / df;
+  const T tol = (abs(res) + T(1)) * ldexp(T(1), 1 - min_bits);
+  return !(abs(step) <= tol);
+}
+} // namespace
+
 // Requires function and its derivative
 template <typename F, typename T>
 T newton_raphson(F &&f, T guess, T min, T max, int min_bits, int max_iters,
@@ -275,11 +309,21 @@ T newton_raphson(F &&f, T guess, T min, T max, int min_bits, int max_iters,
     failed = true;
     return guess;
   }
+  // Boost 1.55 does not reject a reversed bracket.
+  if (!(min < max)) {
+    failed = true;
+    return guess;
+  }
+  auto fn = std::forward<F>(f);
   std::uintmax_t max_iter = max_iters;
   try {
     auto res = boost::math::tools::newton_raphson_iterate(
-        std::forward<F>(f), guess, min, max, min_bits, max_iter);
+        fn, guess, min, max, min_bits, max_iter);
     iters = max_iter;
+    if (boost_iterate_missed_root(fn, res, min_bits)) {
+      failed = true;
+      return guess;
+    }
     return res;
   } catch (const boost::math::evaluation_error &) {
     iters = max_iter;
@@ -299,11 +343,20 @@ T halley(F &&f, T guess, T min, T max, int min_bits, int max_iters, int &iters,
     failed = true;
     return guess;
   }
+  if (!(min < max)) {
+    failed = true;
+    return guess;
+  }
+  auto fn = std::forward<F>(f);
   std::uintmax_t max_iter = max_iters;
   try {
-    auto res = boost::math::tools::halley_iterate(std::forward<F>(f), guess,
-                                                  min, max, min_bits, max_iter);
+    auto res = boost::math::tools::halley_iterate(fn, guess, min, max, min_bits,
+                                                  max_iter);
     iters = max_iter;
+    if (boost_iterate_missed_root(fn, res, min_bits)) {
+      failed = true;
+      return guess;
+    }
     return res;
   } catch (const boost::math::evaluation_error &) {
     iters = max_iter;
@@ -323,11 +376,25 @@ T schroder(F &&f, T guess, T min, T max, int min_bits, int max_iters,
     failed = true;
     return guess;
   }
+  if (!(min < max)) {
+    failed = true;
+    return guess;
+  }
+  auto fn = std::forward<F>(f);
   std::uintmax_t max_iter = max_iters;
   try {
+    // Boost 1.66 renamed schroeder_iterate to schroder_iterate.
+#if BOOST_VERSION < 106600
+    auto res = boost::math::tools::schroeder_iterate(
+#else
     auto res = boost::math::tools::schroder_iterate(
-        std::forward<F>(f), guess, min, max, min_bits, max_iter);
+#endif
+        fn, guess, min, max, min_bits, max_iter);
     iters = max_iter;
+    if (boost_iterate_missed_root(fn, res, min_bits)) {
+      failed = true;
+      return guess;
+    }
     return res;
   } catch (const boost::math::evaluation_error &) {
     iters = max_iter;

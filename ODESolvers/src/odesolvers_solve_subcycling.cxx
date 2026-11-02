@@ -128,8 +128,12 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   DECLARE_CCTK_PARAMETERS;
 
   static bool did_output = false;
-  if (verbose || !did_output)
+  if (verbose || !did_output) {
     CCTK_VINFO("Integrator is %s", method);
+    if (CCTK_Equals(method, "IMEX32L"))
+      CCTK_INFO("IMEX32L uses corrected Pareschi-Russo IMEX-SSP3(3,3,2) "
+                 "with distinct partition times, not the former CK tableau");
+  }
   did_output = true;
 
   static Timer timer("ODESolvers::Solve");
@@ -272,6 +276,21 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
     synchronize();
     var.set_valid(make_valid_all());
   };
+  // IMEX uses accepted parent endpoints, not an explicit RK dense formula.
+  // Every stage band holds the same secant, so the stage-1 polynomial at
+  // xsi+c/2 is the parent state at this partition's actual physical time.
+  // This also covers the nonzero first implicit stage of a type-A method.
+  const auto calcys_imex_rmbnd = [&](const CCTK_REAL c) {
+    active_levels->loop_coarse_to_fine([&](auto &leveldata) {
+      if (leveldata.level == 0)
+        return;
+      const CCTK_REAL xsi = dense_output_point(leveldata, 1).xsi;
+      CarpetX::FillRKBoundary(leveldata.patch, leveldata.level, var_groups,
+                              /*tl=*/0, /*stage=*/1, xsi + c / 2, dt * 2);
+    });
+    synchronize();
+    var.set_valid(make_valid_all());
+  };
   // Store the interior RHS of this stage of each level into the k-stage source
   // band of its child level, which owns the bands (levels with children only),
   // to be combined into the children's refinement-boundary fills by
@@ -305,7 +324,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   // IMEX methods have no compatible RK dense-output formula here. Store the
   // accepted coarse-step secant in every stage band; the existing RK3/RK4
   // dense-output polynomial then becomes exact linear endpoint interpolation
-  // at the IMEX32L/IMEX42L stage abscissae.
+  // at each explicit OR implicit partition's stage abscissa.
   const auto refresh_parent_endpoint_stages = [&]() {
     active_levels->loop_serially([&](const auto &restrict leveldata) {
       if (leveldata.level == 0)
@@ -324,15 +343,13 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
   };
 
   const auto run_imex =
-      [&](const vector<CCTK_REAL> &cs, const vector<vector<CCTK_REAL> > &a_exp,
-          const vector<vector<CCTK_REAL> > &a_imp,
-          const vector<CCTK_REAL> &b_exp, const vector<CCTK_REAL> &b_imp) {
-        const int nstages = cs.size();
+      [&](const imex_tableau_t &tableau) {
+        const int nstages = tableau.nstages;
+        const auto &a_exp = tableau.a_exp;
+        const auto &a_imp = tableau.a_imp;
+        const auto &b_exp = tableau.b_exp;
+        const auto &b_imp = tableau.b_imp;
         assert(nstages == rk.nstages);
-        assert(int(a_exp.size()) == nstages);
-        assert(int(a_imp.size()) == nstages);
-        assert(int(b_exp.size()) == nstages);
-        assert(int(b_imp.size()) == nstages);
 
         const auto old = var.copy(make_valid_all());
         vector<statecomp_t> fks;
@@ -366,19 +383,21 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
           var.check_valid(make_valid_int(),
                           "ODESolvers after defining IMEX stage base");
           mark_invalid(dep_groups);
-          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
-              old_time + cs.at(stage) * dt;
         };
 
         for (int stage = 0; stage < nstages; ++stage) {
-          if (stage > 0) {
+          if (stage > 0)
             define_stage_base(stage);
-            calcys_rmbnd(stage + 1);
+          const CCTK_REAL c_imp = tableau.c_imp.at(stage);
+          const CCTK_REAL c_exp = tableau.c_exp.at(stage);
+          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + c_imp * dt;
+          if (stage > 0 || tableau.c_imp.at(stage) != 0) {
+            calcys_imex_rmbnd(c_imp);
             calcpreimplicit();
             // PostStep routines may touch evolved interiors or ghosts. Restore
             // the time-interpolated coarse-fine boundary before the implicit
             // solve consumes this stage state.
-            calcys_rmbnd(stage + 1);
+            calcys_imex_rmbnd(c_imp);
           }
 
           const CCTK_REAL diag = a_imp.at(stage).at(stage);
@@ -400,8 +419,11 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
                             "ODESolvers effective implicit RHS");
             CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
             g = rhs.copy(make_valid_int());
+          }
 
-            calcys_rmbnd(stage + 1);
+          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + c_exp * dt;
+          if (diag != 0 || c_exp != c_imp) {
+            calcys_imex_rmbnd(c_exp);
             calcpoststep();
           }
 
@@ -431,7 +453,7 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
                         "ODESolvers after defining IMEX final state");
         mark_invalid(dep_groups);
         *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt;
-        calcys_rmbnd(nstages + 1);
+        calcys_imex_rmbnd(1);
         calcpoststep();
         if (!var_groups.empty())
           store_endpoint_stages();
@@ -558,41 +580,10 @@ extern "C" void ODESolvers_Solve_Subcycling(CCTK_ARGUMENTS) {
     calcpoststep();
 
   } else if (CCTK_EQUALS(method, "IMEX42L")) {
-
-    const vector<CCTK_REAL> c{0, CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 1};
-    const vector<vector<CCTK_REAL> > a_exp{
-        {0, 0, 0, 0},
-        {CCTK_REAL(1) / 2, 0, 0, 0},
-        {0, CCTK_REAL(1) / 2, 0, 0},
-        {0, 0, 1, 0},
-    };
-    const vector<vector<CCTK_REAL> > a_imp{
-        {0, 0, 0, 0},
-        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0, 0},
-        {0, CCTK_REAL(1) / 6, CCTK_REAL(1) / 3, 0},
-        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 3, CCTK_REAL(1) / 3,
-         CCTK_REAL(1) / 6},
-    };
-    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 3,
-                             CCTK_REAL(1) / 3, CCTK_REAL(1) / 6};
-    run_imex(c, a_exp, a_imp, b, b);
+    run_imex(imex42l);
 
   } else if (CCTK_EQUALS(method, "IMEX32L")) {
-
-    const vector<CCTK_REAL> c{0, 1, CCTK_REAL(1) / 2};
-    const vector<vector<CCTK_REAL> > a_exp{
-        {0, 0, 0},
-        {1, 0, 0},
-        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0},
-    };
-    const vector<vector<CCTK_REAL> > a_imp{
-        {0, 0, 0},
-        {CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 0},
-        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 6, CCTK_REAL(2) / 3},
-    };
-    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 6,
-                             CCTK_REAL(2) / 3};
-    run_imex(c, a_exp, a_imp, b, b);
+    run_imex(imex32l);
 
   } else {
     // Unreachable: rk.subcycling_ok is asserted above, and the table marks

@@ -71,8 +71,16 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
   DECLARE_CCTK_PARAMETERS;
 
   static bool did_output = false;
-  if (verbose || !did_output)
+  if (verbose || !did_output) {
     CCTK_VINFO("ODE integrator is %s", method);
+    if (CCTK_Equals(method, "IMEX32L"))
+      CCTK_INFO("IMEX32L uses corrected Pareschi-Russo IMEX-SSP3(3,3,2) "
+                 "with distinct partition times, not the former CK tableau");
+    if (CCTK_Equals(method, "Implicit Euler"))
+      CCTK_WARN(CCTK_WARN_ALERT,
+                "Implicit Euler is a deprecated name for IMEX122 midpoint, "
+                "not backward Euler; select IMEX122 explicitly");
+  }
   did_output = true;
 
   static Timer timer("ODESolvers::Solve");
@@ -259,15 +267,13 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
   };
 
   const auto run_imex =
-      [&](const vector<CCTK_REAL> &cs, const vector<vector<CCTK_REAL> > &a_exp,
-          const vector<vector<CCTK_REAL> > &a_imp,
-          const vector<CCTK_REAL> &b_exp, const vector<CCTK_REAL> &b_imp) {
-        const int nstages = cs.size();
+      [&](const imex_tableau_t &tableau) {
+        const int nstages = tableau.nstages;
+        const auto &a_exp = tableau.a_exp;
+        const auto &a_imp = tableau.a_imp;
+        const auto &b_exp = tableau.b_exp;
+        const auto &b_imp = tableau.b_imp;
         assert(nstages == rk.nstages);
-        assert(int(a_exp.size()) == nstages);
-        assert(int(a_imp.size()) == nstages);
-        assert(int(b_exp.size()) == nstages);
-        assert(int(b_imp.size()) == nstages);
 
         const auto old = copy_state(var, make_valid_all());
         vector<statecomp_t> fks;
@@ -296,15 +302,17 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
           var.check_valid(make_valid_int(),
                           "ODESolvers after defining IMEX stage base");
           mark_invalid(dep_groups);
-          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) =
-              old_time + cs.at(stage) * dt;
         };
 
         for (int stage = 0; stage < nstages; ++stage) {
-          if (stage > 0) {
+          if (stage > 0)
             define_stage_base(stage);
+          const CCTK_REAL c_imp = tableau.c_imp.at(stage);
+          const CCTK_REAL c_exp = tableau.c_exp.at(stage);
+          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + c_imp * dt;
+          // A type-A tableau also solves at its FIRST implicit stage.
+          if (stage > 0 || tableau.c_imp.at(stage) != 0)
             calcpreimplicit();
-          }
 
           const CCTK_REAL diag = a_imp.at(stage).at(stage);
           statecomp_t g;
@@ -327,11 +335,13 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
                             "ODESolvers effective implicit RHS");
             CallScheduleGroup(cctkGH, "ODESolvers_AfterImplicitRHS");
             g = copy_state(rhs, make_valid_int());
-
-            // Refresh derived variables and apply stage projections before
-            // evaluating the explicit operator at the stage state.
-            CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
           }
+
+          // The explicit operator need not have the implicit stage's time.
+          // Refresh analytic backgrounds, boundary data and dependents there.
+          *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + c_exp * dt;
+          if (diag != 0 || c_exp != c_imp)
+            CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
 
           calcrhs(stage + 1, b_exp.at(stage));
           fks.push_back(copy_state(rhs, make_valid_int()));
@@ -727,102 +737,14 @@ extern "C" void ODESolvers_Solve(CCTK_ARGUMENTS) {
     calcupdate(nsteps, dt, 0.0, factors, srcs);
 
   } else if (CCTK_EQUALS(method, "IMEX42L")) {
-
-    const vector<CCTK_REAL> c{0, CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 1};
-    const vector<vector<CCTK_REAL> > a_exp{
-        {0, 0, 0, 0},
-        {CCTK_REAL(1) / 2, 0, 0, 0},
-        {0, CCTK_REAL(1) / 2, 0, 0},
-        {0, 0, 1, 0},
-    };
-    const vector<vector<CCTK_REAL> > a_imp{
-        {0, 0, 0, 0},
-        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0, 0},
-        {0, CCTK_REAL(1) / 6, CCTK_REAL(1) / 3, 0},
-        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 3, CCTK_REAL(1) / 3,
-         CCTK_REAL(1) / 6},
-    };
-    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 3,
-                             CCTK_REAL(1) / 3, CCTK_REAL(1) / 6};
-    run_imex(c, a_exp, a_imp, b, b);
+    run_imex(imex42l);
 
   } else if (CCTK_EQUALS(method, "IMEX32L")) {
-
-    const vector<CCTK_REAL> c{0, 1, CCTK_REAL(1) / 2};
-    const vector<vector<CCTK_REAL> > a_exp{
-        {0, 0, 0},
-        {1, 0, 0},
-        {CCTK_REAL(1) / 4, CCTK_REAL(1) / 4, 0},
-    };
-    const vector<vector<CCTK_REAL> > a_imp{
-        {0, 0, 0},
-        {CCTK_REAL(1) / 2, CCTK_REAL(1) / 2, 0},
-        {CCTK_REAL(1) / 6, CCTK_REAL(1) / 6, CCTK_REAL(2) / 3},
-    };
-    const vector<CCTK_REAL> b{CCTK_REAL(1) / 6, CCTK_REAL(1) / 6,
-                             CCTK_REAL(2) / 3};
-    run_imex(c, a_exp, a_imp, b, b);
+    run_imex(imex32l);
 
   } else if (CCTK_EQUALS(method, "IMEX122") ||
              CCTK_EQUALS(method, "Implicit Euler")) {
-    // Implicit definition:
-    //   y1 = y0 + h/2 f(y0) + h/2 g(y1)
-    //   y2 = y0 + h f(y1) + h g(y1)
-
-    // Implicit RHS:
-    //   u1 = G(u0, h)   where   u1 = u0 + h g(u1)
-
-    // Explicit definition:
-    //   k1 = f(y0)
-    //   y1 = G(y0 + h/2 k1, h/2)
-    //   k'2 = (y1 - y0 - h/2 k1) / (h/2)
-    //   k2 = f(y1)
-    //   y2 = y0 + h k2 + h k'2
-
-    const auto y0 = var.copy(make_valid_int /*all*/ ());
-
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time;
-    if (verbose)
-      CCTK_VINFO("Calculating RHS #1 at t=%g", double(cctkGH->cctk_time));
-    CallScheduleGroup(cctkGH, "ODESolvers_RHS");
-    const auto k1 = rhs.copy(make_valid_int());
-
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt / 2;
-    statecomp_t::lincomb(var, 1, make_array(dt / 2), make_array(&rhs),
-                         make_valid_int());
-    var.check_valid(make_valid_int(),
-                    "ODESolvers after defining new state vector");
-    mark_invalid(dep_groups);
-    CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
-
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt / 2;
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = dt / 2;
-    if (verbose)
-      CCTK_VINFO("Taking implicit step #1 at t=%g with dt=%g",
-                 double(cctkGH->cctk_time), double(cctkGH->cctk_delta_time));
-    CallScheduleGroup(cctkGH, "ODESolvers_ImplicitStep");
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_delta_time) = dt;
-
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt;
-    CallScheduleGroup(cctkGH, "ODESolvers_PostStep");
-    const auto y1 = var.copy(make_valid_int /*all*/ ());
-
-    statecomp_t kprime2;
-    statecomp_t::lincomb(kprime2, 0,
-                         make_array(-CCTK_REAL(1), +CCTK_REAL(1), -dt / 2),
-                         make_array(&y0, &y1, &k1), make_valid_int());
-
-    *const_cast<CCTK_REAL *>(&cctkGH->cctk_time) = old_time + dt;
-    if (verbose)
-      CCTK_VINFO("Calculating RHS #2 at t=%g", double(cctkGH->cctk_time));
-    CallScheduleGroup(cctkGH, "ODESolvers_RHS");
-    const auto k2 = rhs.copy(make_valid_int());
-
-    statecomp_t::lincomb(var, 0, make_array(CCTK_REAL(1), dt, dt),
-                         make_array(&y0, &k2, &kprime2), make_valid_int());
-    var.check_valid(make_valid_int(),
-                    "ODESolvers after defining new state vector");
-    mark_invalid(dep_groups);
+    run_imex(imex122);
 
   } else {
     assert(0);

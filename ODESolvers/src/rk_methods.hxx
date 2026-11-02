@@ -21,6 +21,7 @@
 
 // TODO: Don't include files from other thorns; create a proper interface
 #include "../../CarpetX/src/driver.hxx"
+#include "imex_tableaux.hxx"
 
 #include <cctk.h>
 
@@ -37,10 +38,18 @@ struct rk_method_t {
                       // has a known weight (b below, or a local tableau), so
                       // the solver can feed the driver's flux registers
   bool explicit_b;    // b below is the explicit final-update weight (false
-                      // for IMEX122 and for RKF78/DP87, whose b lives in the
+                      // for RKF78/DP87, whose b lives in the
                       // local tableau in odesolvers_solve.cxx)
   std::array<CCTK_REAL, CarpetX::max_num_rk_stages> b; // final-update weights
 };
+
+constexpr std::array<CCTK_REAL, CarpetX::max_num_rk_stages>
+imex_explicit_weights(const imex_tableau_t &tableau) {
+  std::array<CCTK_REAL, CarpetX::max_num_rk_stages> weights{};
+  for (int stage = 0; stage < tableau.nstages; ++stage)
+    weights[stage] = tableau.b_exp[stage];
+  return weights;
+}
 
 // One row per value of the ODESolvers::method keyword (param.ccl).
 //
@@ -62,12 +71,14 @@ inline constexpr std::array<rk_method_t, 13> rk_methods{{
      {1.0 / 6, 1.0 / 3, 1.0 / 3, 1.0 / 6}},
     {"RKF78", 11, false, true, false, {0, 0, 0, 0}},
     {"DP87", 13, false, true, false, {0, 0, 0, 0}},
-    {"IMEX42L", 4, true, true, true,
-     {1.0 / 6, 1.0 / 3, 1.0 / 3, 1.0 / 6}},
-    {"IMEX32L", 3, true, true, true,
-     {1.0 / 6, 1.0 / 6, 2.0 / 3, 0}},
-    {"IMEX122", 2, false, false, false, {0, 0, 0, 0}},
-    {"Implicit Euler", 2, false, false, false, {0, 0, 0, 0}},
+    {"IMEX42L", imex42l.nstages, true, true, true,
+     imex_explicit_weights(imex42l)},
+    {"IMEX32L", imex32l.nstages, true, true, true,
+     imex_explicit_weights(imex32l)},
+    {"IMEX122", imex122.nstages, false, true, true,
+     imex_explicit_weights(imex122)},
+    {"Implicit Euler", imex122.nstages, false, true, true,
+     imex_explicit_weights(imex122)},
 }};
 
 namespace rk_methods_detail {

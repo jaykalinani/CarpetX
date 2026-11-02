@@ -16,9 +16,9 @@ KEYWORD method "ODE solver method" STEERABLE=always
   "DP87" :: "Dormand & Prince 8(7)"
 
   "IMEX42L" :: "RK4-explicit / L-stable DIRK implicit IMEX(4,4,2)"
-  "IMEX32L" :: "SSPRK3-explicit / L-stable DIRK implicit IMEX(3,3,2)"
-  "IMEX122" :: "IMEX midpoint (1,2,2)"
-  "Implicit Euler" :: "IMEX midpoint (1,2,2), misnamed"
+  "IMEX32L" :: "Pareschi-Russo IMEX-SSP3(3,3,2), distinct explicit/implicit stage times; replaces the former inconsistent CK tableau"
+  "IMEX122" :: "Explicit/implicit midpoint, second order and A-stable but not L-stable"
+  "Implicit Euler" :: "Deprecated compatibility alias of IMEX122; this is midpoint, not backward Euler"
 } "RK2"
 
 PRIVATE:

@@ -2136,7 +2136,7 @@ void *SetupGH(tFleshConfig *fc, int convLevel, cGH *restrict cctkGH) {
   pp.add("amrex.the_arena_is_managed", 1);
 #endif
 
-  pp.add("amrex.use_gpu_aware_mpi", 1);
+  // pp.add("amrex.use_gpu_aware_mpi", 1);
 
   // Set blocking factors via parameter table since AmrMesh needs to
   // know them when its constructor is running, but there are no

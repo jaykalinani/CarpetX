@@ -673,6 +673,18 @@ extern "C" void ODESolvers_Solve_Subcycling_Recovery(CCTK_ARGUMENTS) {
   if (setup.nvars == 0)
     return;
 
+  // The normal evolution path warms these masks before entering the parallel
+  // subcycling kernels.  A checkpoint recovery reaches CalcYfFromKcs directly,
+  // before any normal evolution step has done that work.  Rebuild the
+  // side-effect-free cache here so the recovered dense-output bands can be
+  // scattered into coarse-fine ghost zones.
+  active_levels->loop_serially([&](const auto &leveldata) {
+    for (const int gi : var_groups) {
+      const auto &groupdata = *leveldata.groupdata.at(gi);
+      leveldata.build_cf_mask(groupdata.indextype, groupdata.nghostzones);
+    }
+  });
+
   // Refill each recovered fine level's refinement-boundary (cf) ghosts.
   // Synchronized levels (and old/synchronized checkpoints with no restored band
   // data) use spatial tl=0 prolongation. Unsynchronized levels carry mid-cycle
